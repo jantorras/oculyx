@@ -153,14 +153,17 @@ namespace Oculyx
 
         public int RunScript(string command)
         {
-            string encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(command));
-            var psi = new ProcessStartInfo(PowerShellExe(), "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encoded)
+            string encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes("$ProgressPreference='SilentlyContinue'; " + command));
+            // -OutputFormat Text: plain lines instead of CLIXML when output is redirected
+            var psi = new ProcessStartInfo(PowerShellExe(), "-NoProfile -NonInteractive -ExecutionPolicy Bypass -OutputFormat Text -EncodedCommand " + encoded)
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true
             };
+            // If we were started from PowerShell 7, its PSModulePath would stop Windows PowerShell 5.1 from finding its own modules.
+            psi.EnvironmentVariables.Remove("PSModulePath");
             using (var p = new Process())
             {
                 p.StartInfo = psi;
@@ -168,7 +171,7 @@ namespace Oculyx
                 {
                     if (e.Data == null) return;
                     string line = e.Data.TrimEnd();
-                    if (line.Length == 0) return;
+                    if (line.Length == 0 || line.StartsWith("#< CLIXML", StringComparison.Ordinal) || line.StartsWith("<Objs ", StringComparison.Ordinal)) return;
                     if (line.StartsWith("ERROR:")) { Failed = true; LastError = line.Substring(6).Trim(); }
                     if (line.IndexOf("Connected to Oculyx", StringComparison.Ordinal) >= 0) Succeeded = true;
                     OnLine(line);
