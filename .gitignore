@@ -13,3 +13,4 @@ agent-state
 
 # third-party design references used only while designing the UI
 docs/design-refs
+server/assets/

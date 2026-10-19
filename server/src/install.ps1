@@ -12,7 +12,9 @@ param(
   [string]$Server = '__SERVER__',
   [switch]$AllowActions,
   [switch]$Uninstall,
-  [switch]$Purge
+  [switch]$Purge,
+  [string]$TrayExe = '',     # path of OculyxSetup.exe: installed as the tray icon (used by the Windows app)
+  [switch]$StartTray
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,6 +25,8 @@ $Root      = Join-Path $env:ProgramData 'Oculyx'
 $NodeDir   = Join-Path $Root 'node'
 $AgentDir  = Join-Path $Root 'agent'
 $StateDir  = Join-Path $Root 'state'
+$AppDir    = Join-Path $Root 'app'     # readable by every user: tray exe + status.json (no secrets)
+$RunKey    = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run'
 $LogFile   = Join-Path $Root 'agent.log'
 $RunCmd    = Join-Path $Root 'run.cmd'
 $TaskName  = 'OculyxAgent'
@@ -53,7 +57,8 @@ function Install-Agent {
     Step 'Removing the Oculyx agent'
     Stop-Agent
     if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false; Ok 'Scheduled task removed' }
-    Remove-Item -Recurse -Force $NodeDir, $AgentDir, $LogFile, "$LogFile.old", $RunCmd -ErrorAction SilentlyContinue
+    Remove-ItemProperty -Path $RunKey -Name 'OculyxTray' -ErrorAction SilentlyContinue
+    Remove-Item -Recurse -Force $NodeDir, $AgentDir, $AppDir, $LogFile, "$LogFile.old", $RunCmd -ErrorAction SilentlyContinue
     if ($Purge) { Remove-Item -Recurse -Force $StateDir -ErrorAction SilentlyContinue; Ok 'Credentials removed' }
     Write-Host ''
     Write-Host 'Done. You can also delete the host from the Oculyx web UI.'
@@ -78,7 +83,10 @@ function Install-Agent {
 
   New-Item -ItemType Directory -Force -Path $Root, $StateDir | Out-Null
   # credentials live here: only SYSTEM and Administrators may read them
-  & icacls.exe $Root /inheritance:r /grant 'SYSTEM:(OI)(CI)F' /grant 'Administrators:(OI)(CI)F' | Out-Null
+  # (SIDs, so this also works on Windows in other languages)
+  & icacls.exe $Root /inheritance:r /grant '*S-1-5-18:(OI)(CI)F' /grant '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+  New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
+  & icacls.exe $AppDir /grant '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
 
   Stop-Agent
 
@@ -142,7 +150,7 @@ function Install-Agent {
   # ---- launcher + scheduled task (SYSTEM, at startup, restarted if it ever fails)
   Step 'Starting the agent (scheduled task)'
   $allow = if ($AllowActions) { 'true' } else { 'false' }
-  $lines = @('@echo off', "set `"OCULYX_SERVER=$Server`"", "set `"OCULYX_NAME=$Name`"", "set `"OCULYX_ALLOW_ACTIONS=$allow`"", "set `"OCULYX_STATE_DIR=$StateDir`"")
+  $lines = @('@echo off', "set `"OCULYX_SERVER=$Server`"", "set `"OCULYX_NAME=$Name`"", "set `"OCULYX_ALLOW_ACTIONS=$allow`"", "set `"OCULYX_STATE_DIR=$StateDir`"", "set `"OCULYX_STATUS_FILE=$AppDir\status.json`"")
   if ($Token) { $lines += "set `"OCULYX_ENROLL_TOKEN=$Token`"" }
   $lines += @(
     "cd /d `"$AgentDir`"",
@@ -178,6 +186,24 @@ function Install-Agent {
   } else {
     Warn 'The agent is running but has not confirmed the connection yet.'
     Write-Host "  Check the log: Get-Content '$LogFile' -Tail 30"
+  }
+  # ---- tray icon (only when installed through OculyxSetup.exe)
+  if ($TrayExe -and (Test-Path $TrayExe)) {
+    Step 'Installing the tray icon'
+    $trayDest = Join-Path $AppDir 'OculyxTray.exe'
+    $bytes = [IO.File]::ReadAllBytes($TrayExe)
+    $n = $bytes.Length
+    # the setup exe carries the one-time token appended to it: do not keep that copy around
+    if ($n -gt 12 -and [Text.Encoding]::ASCII.GetString($bytes, $n - 8, 8) -eq 'OCXCFG01') {
+      $len = [BitConverter]::ToInt32($bytes, $n - 12)
+      $keep = $n - 12 - $len
+      if ($len -gt 0 -and $keep -gt 0) { $trimmed = New-Object byte[] $keep; [Array]::Copy($bytes, $trimmed, $keep); $bytes = $trimmed }
+    }
+    [IO.File]::WriteAllBytes($trayDest, $bytes)
+    try { Invoke-WebRequest -UseBasicParsing -Uri "$Server/install.ps1" -OutFile (Join-Path $AppDir 'install.ps1') -TimeoutSec 20 } catch { Warn 'Could not save a local copy of the uninstaller.' }
+    Set-ItemProperty -Path $RunKey -Name 'OculyxTray' -Value ('"' + $trayDest + '"')
+    if ($StartTray) { Start-Process explorer.exe -ArgumentList ('"' + $trayDest + '"') }
+    Ok 'Tray icon installed (starts with Windows)'
   }
   if ($AllowActions) { Write-Host '  Container start/stop/restart from the UI is enabled for this host.' }
   else { Write-Host '  Read-only mode. Re-run with -AllowActions to manage Docker containers from the UI.' }

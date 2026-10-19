@@ -142,4 +142,10 @@ export const es: Record<string, string> = {
   'evt.rdp_login': 'Inicios de sesión RDP',
   'evt.win_admin_change': 'Cambios en Administradores',
   'cat.win': 'Windows',
+  'add.win_app_title': 'App de Windows (recomendada para PCs)',
+  'add.win_app_help': 'Un instalador listo para este servidor: doble clic, acepta el aviso de Windows y listo. Añade además un icono en la bandeja que muestra si el agente está conectado.',
+  'add.win_app_btn': 'Descargar OculyxSetup.exe',
+  'add.win_app_note': 'El archivo aún no está firmado, así que SmartScreen de Windows puede avisar: elige Más información y Ejecutar de todas formas. Viene con este token de un solo uso.',
+  'add.or_powershell': 'O ejecútalo desde PowerShell (servidores, scripts):',
+  'add.win_app_error': 'No se pudo descargar la app de Windows. ¿Sigue pendiente este token?',
 };

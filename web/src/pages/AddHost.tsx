@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, usePoll, clock } from '../lib';
+import { api, usePoll, clock, getToken } from '../lib';
 import { useT } from '../i18n';
 import { Card, Icon } from '../components/ui';
 
@@ -84,6 +84,29 @@ export function AddHost() {
   const connected = status?.state === 'enrolled' && status.agent?.hasData;
   const expired = status?.state === 'expired';
   const stage = !fresh ? 1 : connected ? 3 : 2;
+
+  async function downloadWindowsApp() {
+    if (!fresh) return;
+    setError('');
+    try {
+      const res = await fetch(`/api/enroll/${fresh.token}/windows-installer`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${getToken() ?? ''}` },
+        body: JSON.stringify({ name: fresh.label, allow: fresh.allow }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'error');
+      const url = URL.createObjectURL(await res.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'OculyxSetup.exe';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (err) {
+      setError(t('add.win_app_error'));
+    }
+  }
 
   async function saveUrl() {
     await api('/settings', { method: 'PUT', body: { 'server.public_url': (editUrl ?? '').trim() } });
@@ -184,6 +207,18 @@ export function AddHost() {
       {stage === 2 && fresh && (
         <Card title={t('add.run_title')} actions={<span className="muted" style={{ fontSize: 12.5 }}>{t('add.expires', { time: clock(fresh.expires) })}</span>}>
           <p className="muted" style={{ marginTop: 0 }}>{fresh.os === 'windows' ? t('add.win_run_help') : `${t('add.run_help')} ${t('add.sudo_note')}`}</p>
+          {fresh.os === 'windows' && settings?.windowsInstaller && (
+            <div className="winapp">
+              <div className="grow">
+                <b>{t('add.win_app_title')}</b>
+                <p className="muted">{t('add.win_app_help')}</p>
+                <p className="muted small">{t('add.win_app_note')}</p>
+              </div>
+              <button className="btn primary" onClick={downloadWindowsApp}>{Icon.arrow} {t('add.win_app_btn')}</button>
+            </div>
+          )}
+          {fresh.os === 'windows' && settings?.windowsInstaller && <p className="muted" style={{ margin: '14px 0 10px', fontSize: 13 }}>{t('add.or_powershell')}</p>}
+          {error && <div className="error" role="alert" style={{ marginBottom: 10 }}>{error}</div>}
           <div className="seg" role="tablist" style={{ marginBottom: 12 }}>
             <button role="tab" aria-selected={tab === 'one'} className={tab === 'one' ? 'active' : ''} onClick={() => setTab('one')}>{t('add.tab_one')}</button>
             <button role="tab" aria-selected={tab === 'inspect'} className={tab === 'inspect' ? 'active' : ''} onClick={() => setTab('inspect')}>{t('add.tab_inspect')}</button>

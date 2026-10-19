@@ -1,5 +1,5 @@
 import WebSocket from 'ws';
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Provider } from './protocol.ts';
 
@@ -11,6 +11,8 @@ export interface ConnOptions {
   metricsEvery?: number;
   dockerEvery?: number;
   securityEvery?: number;
+  /** If set, a small JSON status file (connected, server, name, ...) is kept up to date for local UIs such as the Windows tray icon. */
+  statusFile?: string;
   log?: (msg: string) => void;
 }
 
@@ -26,10 +28,23 @@ export class Connection {
   private log: (m: string) => void;
   private o: ConnOptions;
   private p: Provider;
+  private connectedSince = 0;
   constructor(o: ConnOptions, p: Provider) {
     this.o = o;
     this.p = p;
     this.log = o.log ?? ((m) => console.log(`[agent:${o.name}] ${m}`));
+  }
+
+  private writeStatus(connected: boolean) {
+    const f = this.o.statusFile;
+    if (!f) return;
+    try {
+      const body = JSON.stringify({ connected, server: this.o.server, name: this.o.name, since: this.connectedSince, updated: Date.now() });
+      writeFileSync(`${f}.tmp`, body);
+      renameSync(`${f}.tmp`, f);
+    } catch {
+      /* the status file is a convenience; never let it break monitoring */
+    }
   }
 
   private credsFile() {
@@ -88,9 +103,14 @@ export class Connection {
       };
       ws.on('open', async () => {
         opened = true;
+        this.connectedSince = Date.now();
         this.log('connected');
+        this.writeStatus(true);
         this.send({ t: 'hello', info: await this.p.info() });
-        every(this.o.metricsEvery ?? 10_000, async () => this.send({ t: 'metrics', ...(await this.p.metrics()) }));
+        every(this.o.metricsEvery ?? 10_000, async () => {
+          this.send({ t: 'metrics', ...(await this.p.metrics()) });
+          this.writeStatus(true);
+        });
         every(this.o.dockerEvery ?? 15_000, async () => {
           const containers = await this.p.docker();
           if (containers) this.send({ t: 'docker', containers });
@@ -117,6 +137,7 @@ export class Connection {
       });
       ws.on('close', (code) => {
         stop();
+        this.writeStatus(false);
         if (!opened) return reject(new Error(`connection failed (${code})`));
         this.log(`disconnected (${code})`);
         resolve();

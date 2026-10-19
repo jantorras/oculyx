@@ -188,3 +188,7 @@ label.mode.on { border-color: color-mix(in srgb, var(--accent) 60%, var(--line))
 label.mode input { width: 17px; height: 17px; margin: 2px 0 0; padding: 0; flex: none; accent-color: var(--accent); }
 label.mode span { display: grid; gap: 2px; }
 label.mode small { color: var(--muted); font-size: 12.5px; }
+
+.winapp { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; padding: 16px 18px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.winapp p { margin: 4px 0 0; font-size: 13.5px; }
+.winapp p.small { font-size: 12px; }

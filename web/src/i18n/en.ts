@@ -142,4 +142,10 @@ export const en: Record<string, string> = {
   'evt.rdp_login': 'RDP logons',
   'evt.win_admin_change': 'Administrators changes',
   'cat.win': 'Windows',
+  'add.win_app_title': 'Windows app (recommended for PCs)',
+  'add.win_app_help': 'A ready-to-run installer for this server: double-click it, accept the Windows prompt and you are done. It also adds a tray icon that shows whether the agent is connected.',
+  'add.win_app_btn': 'Download OculyxSetup.exe',
+  'add.win_app_note': 'The file is not code-signed yet, so Windows SmartScreen may warn: choose More info, then Run anyway. It is pre-filled with this single-use token.',
+  'add.or_powershell': 'Or run it from PowerShell (servers, scripts):',
+  'add.win_app_error': 'Could not download the Windows app. Is this token still pending?',
 };

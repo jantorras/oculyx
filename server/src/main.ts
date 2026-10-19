@@ -8,7 +8,7 @@ import { Db } from './db.ts';
 import { Alerts, OFFLINE_AFTER_MS, thresholds, DEFAULT_THRESHOLDS } from './alerts.ts';
 import { Hub } from './hub.ts';
 import { notify } from './notify.ts';
-import { agentBundle, renderInstallScript, safeServerUrl } from './installer.ts';
+import { agentBundle, renderInstallScript, safeServerUrl, stampExe } from './installer.ts';
 import { hashPassword, verifyPassword, loadSecret, signToken, verifyToken, randomToken, sha256, hasRole, LoginLimiter, type Role } from './auth.ts';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -16,6 +16,7 @@ const PORT = Number(process.env.PORT ?? 8080);
 const DATA_DIR = resolve(process.env.OCULYX_DATA ?? join(here, '../../data'));
 const AGENT_DIR = resolve(process.env.OCULYX_AGENT_DIR ?? join(here, '../../agent'));
 const TOKEN_TTL_MS = 24 * 3600_000;
+const WIN_EXE = resolve(join(here, '../assets/OculyxSetup.exe'));
 const WEB_DIR = resolve(process.env.OCULYX_WEB ?? join(here, '../../web/dist'));
 const RETENTION_DAYS = Number(process.env.OCULYX_RETENTION_DAYS ?? 14);
 const SESSION_MS = 12 * 3600_000;
@@ -364,6 +365,24 @@ app.post('/api/enroll', admin, async (req) => {
   return { token, expires };
 });
 
+/** Windows app, pre-configured for this server and one enrollment token. */
+app.post('/api/enroll/:token/windows-installer', admin, async (req, reply) => {
+  const token = String((req.params as any).token);
+  const t = db.get('SELECT * FROM enroll_tokens WHERE token=? AND used_by IS NULL AND (expires IS NULL OR expires>?)', token, Date.now());
+  if (!t) return reply.code(404).send({ error: 'not_found' });
+  if (!existsSync(WIN_EXE)) return reply.code(404).send({ error: 'installer_unavailable' });
+  const body = (req.body ?? {}) as { name?: string; allow?: boolean };
+  const okName = (n: unknown) => typeof n === 'string' && /^[A-Za-z0-9._ -]{1,60}$/.test(n);
+  const name = okName(body.name) ? (body.name as string) : okName(t.label) && t.label !== 'agent' ? t.label : '';
+  const server = safeServerUrl(db.setting('server.public_url'), safeServerUrl(originOf(req), 'http://localhost:' + PORT));
+  audit(req.user!.username, 'enroll.windows_installer', name || t.label, req.ip);
+  return reply
+    .type('application/octet-stream')
+    .header('content-disposition', 'attachment; filename="OculyxSetup.exe"')
+    .header('cache-control', 'no-store')
+    .send(stampExe(readFileSync(WIN_EXE), { server, token, name, allow: !!body.allow }));
+});
+
 app.delete('/api/enroll/:token', admin, async (req) => {
   db.run('DELETE FROM enroll_tokens WHERE token=? AND used_by IS NULL', (req.params as any).token);
   return { ok: true };
@@ -415,6 +434,7 @@ const SETTING_KEYS = ['server.public_url', 'notify.webhook', 'notify.telegram_to
 app.get('/api/settings', admin, async () => ({
   ...Object.fromEntries(SETTING_KEYS.map((k) => [k, db.setting(k)])),
   defaults: DEFAULT_THRESHOLDS,
+  windowsInstaller: existsSync(WIN_EXE),
   effective: thresholds(db),
 }));
 

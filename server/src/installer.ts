@@ -37,3 +37,15 @@ export function agentBundle(agentDir: string): Map<string, string | Buffer> {
   }
   return files;
 }
+
+/**
+ * Windows app: the server stamps the connection settings onto the end of OculyxSetup.exe, so the user
+ * only has to double-click it. Layout: [exe][json][int32 json length][ascii "OCXCFG01"].
+ */
+export function stampExe(exe: Buffer, cfg: { server: string; token: string; name: string; allow: boolean }): Buffer {
+  const json = Buffer.from(JSON.stringify(cfg), 'utf8');
+  const tail = Buffer.alloc(12);
+  tail.writeInt32LE(json.length, 0);
+  tail.write('OCXCFG01', 4, 'ascii');
+  return Buffer.concat([exe, json, tail]);
+}

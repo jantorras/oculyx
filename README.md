@@ -86,6 +86,14 @@ Open **PowerShell as Administrator** on the machine and paste the command the UI
 
 It downloads a portable, checksum-verified Node.js and the agent from your server, and runs the agent as a scheduled task under SYSTEM (`ProgramData\Oculyx`, locked to Administrators). Same script upgrades it; `-Uninstall [-Purge]` removes it; `-AllowActions` enables Docker Desktop container control.
 
+### Windows app (for PCs: double-click, no PowerShell)
+
+In the web UI choose **Add server -> Windows -> Download OculyxSetup.exe**. The server hands you a ~35 KB installer already stamped with its own address and a single-use token. Double-click it, accept the Windows prompt, done: it installs the agent and adds a **tray icon** (green = connected, with *Open dashboard* and *Uninstall*).
+
+- Unattended rollout (GPO / Intune / scripts): `OculyxSetup.exe --silent` (exit code 0 = ok, log in `%TEMP%\oculyx-setup.log`).
+- The file is **not code-signed**, so Windows SmartScreen may warn the first time (*More info -> Run anyway*). Sign it with your own certificate if you roll it out widely.
+- It is compiled in CI with the C# compiler that ships with Windows (no SDK); source in `windows/OculyxSetup`.
+
 ### How the Linux installer works
 
 The installer checks requirements, downloads the agent from **your** server, starts it and confirms the connection. Re-running upgrades it; `--uninstall [--purge]` removes it; `--allow-actions` enables start/stop/restart of containers from the UI. Tokens are single-use and expire after 24 hours. Prefer to read it first? `curl -fsSL https://YOUR-OCULYX/install.sh | less`.

@@ -9,10 +9,28 @@ permissions:
   contents: read
 
 jobs:
+  # The Windows companion app is compiled with the C# compiler that ships with Windows.
+  windows-app:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build OculyxSetup.exe
+        shell: powershell
+        run: .\scripts\build-windows-app.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-app
+          path: server/assets/OculyxSetup.exe
+
   build:
+    needs: windows-app
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-app
+          path: server/assets
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -214,6 +232,71 @@ jobs:
           & ([scriptblock]::Create((irm 'http://localhost:8080/install.ps1'))) -Uninstall -Purge
           if (Get-ScheduledTask -TaskName OculyxAgent -ErrorAction SilentlyContinue) { throw 'scheduled task still present' }
           if (Test-Path "$env:ProgramData\Oculyx\agent") { throw 'agent folder still present' }
+
+      - name: 'Windows app - the stamped installer installs silently (what GPO / Intune would run)'
+        shell: pwsh
+        run: |
+          $api = 'http://localhost:8080/api'
+          $h = @{ authorization = "Bearer $env:SESSION" }
+          $t = (Invoke-RestMethod -Method Post "$api/enroll" -Headers $h -ContentType 'application/json' -Body '{"label":"ci-win-app"}').token
+          "::add-mask::$t" | Write-Host
+          $exe = Join-Path $env:RUNNER_TEMP 'OculyxSetup.exe'
+          Invoke-WebRequest -Method Post "$api/enroll/$t/windows-installer" -Headers $h -ContentType 'application/json' -Body '{"name":"ci-windows-app","allow":false}' -OutFile $exe
+          $stamped = (Get-Item $exe).Length
+          $plain = (Get-Item 'server\assets\OculyxSetup.exe').Length
+          "downloaded $stamped bytes (plain exe $plain)"
+          if ($stamped -le $plain) { throw 'the download was not stamped with settings' }
+          $p = Start-Process -FilePath $exe -ArgumentList '--silent' -Wait -PassThru
+          "setup exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { Get-Content "$env:TEMP\oculyx-setup.log" -ErrorAction SilentlyContinue | Select-Object -Last 40; throw "setup failed with exit code $($p.ExitCode)" }
+          $a = $null
+          for ($i = 0; $i -lt 60; $i++) {
+            $o = Invoke-RestMethod "$api/overview" -Headers $h
+            $a = $o.agents | Where-Object { $_.name -eq 'ci-windows-app' -and $_.online -and $_.metrics } | Select-Object -First 1
+            if ($a) { break }
+            Start-Sleep 2
+          }
+          if (-not $a) { throw 'the app-installed agent never reported metrics' }
+          $app = Join-Path $env:ProgramData 'Oculyx\app'
+          $tray = Join-Path $app 'OculyxTray.exe'
+          if (-not (Test-Path $tray)) { throw 'tray exe was not installed' }
+          if ((Get-Item $tray).Length -ne $plain) { throw "the installed tray exe still carries the token overlay ($((Get-Item $tray).Length) vs $plain bytes)" }
+          if (-not (Test-Path (Join-Path $app 'install.ps1'))) { throw 'uninstaller copy missing' }
+          $run = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run').OculyxTray
+          if (-not $run) { throw 'tray autostart key missing' }
+          "autostart: $run"
+          # the agent keeps a status file for the tray icon
+          $st = $null
+          for ($i = 0; $i -lt 30; $i++) { if (Test-Path (Join-Path $app 'status.json')) { $st = Get-Content (Join-Path $app 'status.json') -Raw | ConvertFrom-Json; if ($st.connected) { break } }; Start-Sleep 2 }
+          "status.json: $($st | ConvertTo-Json -Compress)"
+          if (-not $st.connected) { throw 'status.json does not report connected' }
+          # every user must be able to read it (no secrets in there), but not the agent folder
+          $acl = (icacls $app) -join ' '
+          if ($acl -notmatch 'BUILTIN\\Users') { throw "Users cannot read the app folder: $acl" }
+
+      - name: 'Windows app - the tray icon starts (best effort: runners may have no interactive desktop)'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath (Join-Path $env:ProgramData 'Oculyx\app\OculyxTray.exe') -PassThru
+          Start-Sleep 6
+          if ($p.HasExited) { throw "tray exited early with code $($p.ExitCode)" }
+          'tray is running'
+          Stop-Process -Id $p.Id -Force
+
+      - name: 'Windows app - uninstall removes everything'
+        shell: pwsh
+        run: |
+          $tray = Join-Path $env:ProgramData 'Oculyx\app\OculyxTray.exe'
+          Start-Process -FilePath $tray -ArgumentList '--uninstall', '--silent' -Wait
+          for ($i = 0; $i -lt 60; $i++) {
+            if (-not (Get-ScheduledTask -TaskName OculyxAgent -ErrorAction SilentlyContinue) -and -not (Test-Path "$env:ProgramData\Oculyx\agent")) { break }
+            Start-Sleep 2
+          }
+          if (Get-ScheduledTask -TaskName OculyxAgent -ErrorAction SilentlyContinue) { throw 'scheduled task still present' }
+          if (Test-Path "$env:ProgramData\Oculyx\agent") { throw 'agent folder still present' }
+          if ((Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -ErrorAction SilentlyContinue).OculyxTray) { throw 'autostart key still present' }
+          'clean'
 
       - name: Logs (on failure)
         if: failure()

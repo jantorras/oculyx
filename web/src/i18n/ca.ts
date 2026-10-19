@@ -142,4 +142,10 @@ export const ca: Record<string, string> = {
   'evt.rdp_login': 'Inicis de sessió RDP',
   'evt.win_admin_change': 'Canvis a Administradors',
   'cat.win': 'Windows',
+  'add.win_app_title': 'App de Windows (recomanada per a PCs)',
+  'add.win_app_help': 'Un instal·lador llest per a aquest servidor: doble clic, accepta l’avís de Windows i ja està. A més afegeix una icona a la safata que mostra si l’agent està connectat.',
+  'add.win_app_btn': 'Descarrega OculyxSetup.exe',
+  'add.win_app_note': 'El fitxer encara no està signat, així que SmartScreen de Windows pot avisar: tria Més informació i Executa igualment. Ve amb aquest token d’un sol ús.',
+  'add.or_powershell': 'O executa-ho des de PowerShell (servidors, scripts):',
+  'add.win_app_error': 'No s’ha pogut descarregar l’app de Windows. Aquest token encara és pendent?',
 };
