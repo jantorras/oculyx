@@ -130,4 +130,8 @@ export const en: Record<string, string> = {
   'add.mode_docker_help': 'Recommended when the host already runs Docker. Isolated and easy to remove.',
   'add.mode_native': 'System service (no Docker)',
   'add.mode_native_help': 'A systemd service. Best for Proxmox hosts, LXC containers and hosts without Docker.',
+  'containers.all_servers': 'All servers',
+  'containers.server': 'Server',
+  'add.sudo_note': 'Works as root (e.g. a Proxmox shell) and with sudo on Ubuntu/Debian.',
+  'containers.subtitle_one': '{running} of {total} containers running on {name}',
 };

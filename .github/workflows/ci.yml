@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Shell scripts
+        run: |
+          shellcheck -S warning -s bash deploy/install-server.sh deploy/proxmox/oculyx-lxc.sh server/src/install.sh scripts/package.sh
+      - name: Package
+        run: bash scripts/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oculyx-package
+          path: |
+            oculyx.tar.gz
+            oculyx.tar.gz.sha256
+
+  # Real Linux end-to-end: install the server from the package, then enroll a native agent and a Docker agent.
+  e2e:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: oculyx-package
+
+      - name: Install the server (systemd service, Node 24 from nodejs.org)
+        run: |
+          sudo OCULYX_TARBALL="$PWD/oculyx.tar.gz" bash deploy/install-server.sh 2>&1 | tee install.log
+          grep -o 'password  [^ ]*' install.log || true
+          PW="$(sudo journalctl -u oculyx --no-pager -o cat | grep -o 'with password: .*' | tail -1 | sed 's/^with password: //')"
+          test -n "$PW"
+          echo "ADMIN_PW=$PW" >> "$GITHUB_ENV"
+          curl -fsS http://localhost:8080/healthz
+
+      - name: Sign in and create enrollment tokens
+        run: |
+          API=http://localhost:8080/api
+          TOKEN="$(curl -fsS -X POST $API/auth/login -H 'content-type: application/json' -d "{\"username\":\"admin\",\"password\":\"$ADMIN_PW\"}" | jq -r .token)"
+          test "$TOKEN" != null
+          echo "::add-mask::$TOKEN"
+          echo "SESSION=$TOKEN" >> "$GITHUB_ENV"
+          for n in native docker; do
+            T="$(curl -fsS -X POST $API/enroll -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d "{\"label\":\"ci-$n\"}" | jq -r .token)"
+            echo "::add-mask::$T"
+            echo "ENROLL_${n^^}=$T" >> "$GITHUB_ENV"
+          done
+
+      - name: Install a native agent
+        run: curl -fsSL http://localhost:8080/install.sh | sudo bash -s -- --token "$ENROLL_NATIVE" --name ci-native --native
+
+      - name: Install a Docker agent
+        run: curl -fsSL http://localhost:8080/install.sh | sudo bash -s -- --token "$ENROLL_DOCKER" --name ci-docker
+
+      - name: Both agents report real data
+        run: |
+          API=http://localhost:8080/api
+          for i in $(seq 1 60); do
+            OUT="$(curl -fsS $API/overview -H "authorization: Bearer $SESSION")"
+            READY="$(echo "$OUT" | jq '[.agents[] | select(.online and .metrics != null)] | length')"
+            [ "$READY" -ge 2 ] && break
+            sleep 2
+          done
+          echo "$OUT" | jq '.agents[] | {name, online, os: .info.os, cpu: .metrics.cpu, mem: .metrics.mem, score, docker}'
+          test "$READY" -ge 2
+          ID="$(echo "$OUT" | jq '.agents[] | select(.name=="ci-native") | .id')"
+          for i in $(seq 1 30); do
+            D="$(curl -fsS $API/agents/$ID -H "authorization: Bearer $SESSION")"
+            [ "$(echo "$D" | jq '.ports | length')" -gt 0 ] && break
+            sleep 2
+          done
+          echo "$D" | jq '{ports: (.ports | length), findings: (.findings | length)}'
+          test "$(echo "$D" | jq '.ports | length')" -gt 0
+          DID="$(echo "$OUT" | jq '.agents[] | select(.name=="ci-docker") | .id')"
+          for i in $(seq 1 30); do
+            DD="$(curl -fsS $API/agents/$DID -H "authorization: Bearer $SESSION")"
+            [ "$(echo "$DD" | jq '(.containers // []) | length')" -gt 0 ] && break
+            sleep 2
+          done
+          echo "$DD" | jq '{containers: [.containers[]?.name]}'
+          test "$(echo "$DD" | jq '(.containers // []) | length')" -gt 0
+
+      - name: Upgrade keeps the data and signs in with the same password
+        run: |
+          sudo OCULYX_TARBALL="$PWD/oculyx.tar.gz" bash deploy/install-server.sh
+          ls /var/lib/oculyx/backups
+          curl -fsS -X POST http://localhost:8080/api/auth/login -H 'content-type: application/json' -d "{\"username\":\"admin\",\"password\":\"$ADMIN_PW\"}" | jq -e .token >/dev/null
+          test "$(curl -fsS http://localhost:8080/api/overview -H "authorization: Bearer $(curl -fsS -X POST http://localhost:8080/api/auth/login -H 'content-type: application/json' -d "{\"username\":\"admin\",\"password\":\"$ADMIN_PW\"}" | jq -r .token)" | jq '.agents | length')" -ge 2
+
+      - name: Agents uninstall cleanly
+        run: |
+          curl -fsSL http://localhost:8080/install.sh | sudo bash -s -- --uninstall --purge
+          if systemctl is-active --quiet oculyx-agent; then echo "native agent still running"; exit 1; fi
+          if docker ps -a --format '{{.Names}}' | grep -q oculyx-agent; then echo "agent container still present"; exit 1; fi
+
+      - name: Server logs (on failure)
+        if: failure()
+        run: |
+          sudo journalctl -u oculyx --no-pager -n 80 || true
+          sudo journalctl -u oculyx-agent --no-pager -n 60 || true
+          docker logs oculyx-agent 2>&1 | tail -40 || true

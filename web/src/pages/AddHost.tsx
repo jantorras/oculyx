@@ -70,8 +70,8 @@ export function AddHost() {
   }
 
   const flags = (f: Fresh) => `--token ${f.token}${f.label ? ` --name ${f.label}` : ''}${f.native ? ' --native' : ''}${f.allow ? ' --allow-actions' : ''}${f.docker ? ' --install-docker' : ''}`;
-  const oneLiner = (f: Fresh) => `curl -fsSL ${base}/install.sh | sudo bash -s -- ${flags(f)}`;
-  const inspect = (f: Fresh) => `curl -fsSLo oculyx-install.sh ${base}/install.sh\nless oculyx-install.sh      # read it first (press q to quit)\nsudo bash oculyx-install.sh ${flags(f)}`;
+  const oneLiner = (f: Fresh) => `curl -fsSL ${base}/install.sh | $(command -v sudo) bash -s -- ${flags(f)}`;
+  const inspect = (f: Fresh) => `curl -fsSLo oculyx-install.sh ${base}/install.sh\nless oculyx-install.sh      # read it first (press q to quit)\n$(command -v sudo) bash oculyx-install.sh ${flags(f)}`;
 
   const connected = status?.state === 'enrolled' && status.agent?.hasData;
   const expired = status?.state === 'expired';
@@ -162,7 +162,7 @@ export function AddHost() {
 
       {stage === 2 && fresh && (
         <Card title={t('add.run_title')} actions={<span className="muted" style={{ fontSize: 12.5 }}>{t('add.expires', { time: clock(fresh.expires) })}</span>}>
-          <p className="muted" style={{ marginTop: 0 }}>{t('add.run_help')}</p>
+          <p className="muted" style={{ marginTop: 0 }}>{t('add.run_help')} {t('add.sudo_note')}</p>
           <div className="seg" role="tablist" style={{ marginBottom: 12 }}>
             <button role="tab" aria-selected={tab === 'one'} className={tab === 'one' ? 'active' : ''} onClick={() => setTab('one')}>{t('add.tab_one')}</button>
             <button role="tab" aria-selected={tab === 'inspect'} className={tab === 'inspect' ? 'active' : ''} onClick={() => setTab('inspect')}>{t('add.tab_inspect')}</button>

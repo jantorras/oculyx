@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, usePoll, bytes, pct } from '../lib';
+import { api, usePoll, useRoute, hashQuery, setHashQuery, bytes, pct } from '../lib';
 import { useT } from '../i18n';
 import { useUser, canOperate } from '../App';
 import { Card, Empty, Icon, Skeleton } from '../components/ui';
@@ -8,9 +8,16 @@ import { Donut, HBars } from '../components/Chart';
 export function Containers() {
   const t = useT();
   const user = useUser();
-  const { data, refresh } = usePoll(() => api<any[]>('/containers'), 5000);
+  useRoute(); // re-render when the URL query changes
+  const { data: all, refresh } = usePoll(() => api<any[]>('/containers'), 5000);
+  const { data: overview } = usePoll(() => api<any>('/overview'), 10000);
   const [q, setQ] = useState('');
-  if (!data) return <Skeleton />;
+  if (!all) return <Skeleton />;
+  const hostId = Number(hashQuery().get('host')) || 0;
+  const hosts: { id: number; name: string; online: boolean; total: number }[] = (overview?.agents ?? [])
+    .filter((a: any) => a.docker)
+    .map((a: any) => ({ id: a.id, name: a.name, online: a.online, total: a.docker.total }));
+  const data = hostId ? all.filter((c) => c.agentId === hostId) : all;
   const rows = data.filter((c) => !q || `${c.name} ${c.image} ${c.agent}`.toLowerCase().includes(q.toLowerCase()));
   const running = data.filter((c) => c.state === 'running').length;
   return (
@@ -18,9 +25,15 @@ export function Containers() {
       <div className="topbar">
         <div className="grow">
           <h1>{t('nav.containers')}</h1>
-          <div className="sub">{t('containers.subtitle', { running, total: data.length })}</div>
+          <div className="sub">{hostId ? t('containers.subtitle_one', { running, total: data.length, name: hosts.find((h) => h.id === hostId)?.name ?? '' }) : t('containers.subtitle', { running, total: data.length })}</div>
         </div>
-        <input placeholder={t('common.search')} value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 240 }} aria-label={t('common.search')} />
+        <select value={hostId || ''} onChange={(e) => setHashQuery({ host: e.target.value || null })} aria-label={t('containers.server')} name="host">
+          <option value="">{t('containers.all_servers')} ({all.length})</option>
+          {hosts.map((h) => (
+            <option key={h.id} value={h.id}>{h.name} ({h.total}){h.online ? '' : ` - ${t('status.offline')}`}</option>
+          ))}
+        </select>
+        <input type="search" name="q" autoComplete="off" spellCheck={false} placeholder={t('common.search')} value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 240 }} aria-label={t('common.search')} />
       </div>
       <div className="grid g3" style={{ marginBottom: 16 }}>
         <Card title={t('containers.by_state')}>
@@ -38,7 +51,7 @@ export function Containers() {
         </Card>
       </div>
       <Card flush>
-        {rows.length === 0 ? <Empty>{t('containers.none')}</Empty> : <ContainerTable rows={rows} onChange={refresh} canAct={canOperate(user)} />}
+        {rows.length === 0 ? <Empty>{t('containers.none')}</Empty> : <ContainerTable rows={rows} hideHost={!!hostId} onChange={refresh} canAct={canOperate(user)} />}
       </Card>
     </>
   );

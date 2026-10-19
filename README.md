@@ -65,8 +65,10 @@ Set `OCULYX_DOMAIN` for automatic HTTPS through the bundled Caddy.
 In the web UI click **Add server**, name it, and paste the command on the host:
 
 ```bash
-curl -fsSL https://YOUR-OCULYX/install.sh | sudo bash -s -- --token ocx_... --name web-02
+curl -fsSL https://YOUR-OCULYX/install.sh | $(command -v sudo) bash -s -- --token ocx_... --name web-02
 ```
+
+`$(command -v sudo)` makes the same line work as root (a Proxmox shell has no `sudo`) and as a sudo user on Ubuntu/Debian.
 
 | Mode | Flag | Use it for |
 |---|---|---|

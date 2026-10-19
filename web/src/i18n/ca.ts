@@ -130,4 +130,8 @@ export const ca: Record<string, string> = {
   'add.mode_docker_help': 'Recomanat si el servidor ja fa servir Docker. Aïllat i fàcil de treure.',
   'add.mode_native': 'Servei del sistema (sense Docker)',
   'add.mode_native_help': 'Un servei systemd. Ideal per a hosts Proxmox, contenidors LXC i servidors sense Docker.',
+  'containers.all_servers': 'Tots els servidors',
+  'containers.server': 'Servidor',
+  'add.sudo_note': 'Funciona com a root (p. ex. el shell de Proxmox) i amb sudo a Ubuntu/Debian.',
+  'containers.subtitle_one': '{running} de {total} contenidors en execució a {name}',
 };

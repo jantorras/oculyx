@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Oculyx agent installer.
 # Read it first if you like:  curl -fsSL __SERVER__/install.sh | less
-# Install:                    curl -fsSL __SERVER__/install.sh | sudo bash -s -- --token <TOKEN>
+# Install (as root):          curl -fsSL __SERVER__/install.sh | bash -s -- --token <TOKEN>
+#         (with sudo):        curl -fsSL __SERVER__/install.sh | sudo bash -s -- --token <TOKEN>
 set -euo pipefail
 
 SERVER="__SERVER__"
@@ -69,7 +70,7 @@ done
 printf '%sOculyx agent installer%s  %s%s%s\n' "$B" "$N" "$D" "$SERVER" "$N"
 
 [ "$(uname -s)" = "Linux" ] || fail "This installer supports Linux only."
-[ "$(id -u)" -eq 0 ] || fail "Please run as root, e.g.: curl -fsSL $SERVER/install.sh | sudo bash -s -- --token <TOKEN>"
+[ "$(id -u)" -eq 0 ] || fail "Please run as root (no sudo on this host? log in as root). With sudo: curl -fsSL $SERVER/install.sh | sudo bash -s -- --token <TOKEN>"
 
 # ---- uninstall (handles whichever runtime was used) ----
 if [ "$MODE" = "uninstall" ]; then
