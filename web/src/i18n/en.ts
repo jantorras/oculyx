@@ -134,4 +134,12 @@ export const en: Record<string, string> = {
   'containers.server': 'Server',
   'add.sudo_note': 'Works as root (e.g. a Proxmox shell) and with sudo on Ubuntu/Debian.',
   'containers.subtitle_one': '{running} of {total} containers running on {name}',
+  'add.os': 'Operating system',
+  'add.os_linux_help': 'Debian, Ubuntu, Proxmox, RHEL and similar',
+  'add.os_windows_help': 'Windows 10/11 and Server 2016+. Runs as a scheduled task under SYSTEM.',
+  'add.win_run_help': 'Open PowerShell as Administrator on the Windows machine and paste this. It downloads a portable Node.js, installs the agent and connects it.',
+  'evt.rdp_failed': 'Failed Windows logons',
+  'evt.rdp_login': 'RDP logons',
+  'evt.win_admin_change': 'Administrators changes',
+  'cat.win': 'Windows',
 };

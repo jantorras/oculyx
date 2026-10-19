@@ -68,7 +68,7 @@ export function HostDetail({ id, tab: tabParam }: { id: number; tab?: string }) 
               <Gauge size={150} value={m?.cpu} label="CPU" sub={`${a.info?.cpus ?? '?'} cores`} />
               <Gauge size={150} value={m?.mem} label={t('host.memory')} sub={m ? `${bytes(m.memUsed)} / ${bytes(m.memTotal, 0)}` : undefined} />
               <Gauge size={150} value={m?.disk} label={t('host.disk')} sub={m ? `${bytes(m.diskUsed, 0)} / ${bytes(m.diskTotal, 0)}` : undefined} />
-              <Gauge size={150} value={m && a.info?.cpus ? Math.min(100, (m.load1 / a.info.cpus) * 100) : null} label={t('host.load')} sub={`${m?.load1?.toFixed(2) ?? '-'} / ${a.info?.cpus ?? '?'}`} />
+              {a.info?.platform !== 'win32' && <Gauge size={150} value={m && a.info?.cpus ? Math.min(100, (m.load1 / a.info.cpus) * 100) : null} label={t('host.load')} sub={`${m?.load1?.toFixed(2) ?? '-'} / ${a.info?.cpus ?? '?'}`} />}
             </div>
           </Card>
           <div className="row" style={{ justifyContent: 'space-between', margin: '20px 0 12px' }}>
@@ -85,7 +85,7 @@ export function HostDetail({ id, tab: tabParam }: { id: number; tab?: string }) 
             <Card title={t('host.network')} actions={<span className="num muted" style={{ fontSize: 12.5 }}>↓ {rate(m?.rx)} · ↑ {rate(m?.tx)}</span>}>
               <Chart data={series ?? []} series={[{ key: 'rx', label: '↓ rx', color: 'var(--c3)' }, { key: 'tx', label: '↑ tx', color: 'var(--c4)' }]} format={rate} axisFormat={(v) => rate(v).replace('/s', '')} />
             </Card>
-            <Card title={t('host.load')} actions={<span className="num" style={{ color: 'var(--c5)' }}>{m?.load1?.toFixed(2)}</span>}><Chart data={series ?? []} series={[{ key: 'load1', label: t('host.load'), color: 'var(--c5)' }]} format={(v) => v.toFixed(2)} axisFormat={(v) => v.toFixed(1)} /></Card>
+            {a.info?.platform !== 'win32' && <Card title={t('host.load')} actions={<span className="num" style={{ color: 'var(--c5)' }}>{m?.load1?.toFixed(2)}</span>}><Chart data={series ?? []} series={[{ key: 'load1', label: t('host.load'), color: 'var(--c5)' }]} format={(v) => v.toFixed(2)} axisFormat={(v) => v.toFixed(1)} /></Card>}
           </div>
           <div className="grid g2" style={{ marginTop: 16 }}>
             <Card title={t('host.system')}>

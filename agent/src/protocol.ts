@@ -8,6 +8,7 @@ export interface HostInfo {
   memTotal: number;
   docker: boolean;
   agentVersion: string;
+  platform?: string;
 }
 
 export interface MetricsSample {

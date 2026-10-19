@@ -118,3 +118,96 @@ jobs:
           sudo journalctl -u oculyx --no-pager -n 80 || true
           sudo journalctl -u oculyx-agent --no-pager -n 60 || true
           docker logs oculyx-agent 2>&1 | tail -40 || true
+
+  # Real Windows end-to-end: run the server, then install the agent with the actual install.ps1 under Windows PowerShell 5.1.
+  e2e-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      - name: Start the server
+        shell: pwsh
+        env:
+          OCULYX_ADMIN_PASSWORD: ci-admin-password-1
+          OCULYX_DATA: ${{ runner.temp }}\oculyx-data
+          PORT: '8080'
+        run: |
+          Start-Process node -ArgumentList '--disable-warning=ExperimentalWarning','server/src/main.ts' -RedirectStandardOutput "$env:RUNNER_TEMP\server.log" -RedirectStandardError "$env:RUNNER_TEMP\server.err" -WindowStyle Hidden
+          for ($i = 0; $i -lt 30; $i++) { try { Invoke-RestMethod http://localhost:8080/healthz | Out-Null; break } catch { Start-Sleep 1 } }
+          Invoke-RestMethod http://localhost:8080/healthz
+
+      - name: Create an enrollment token
+        shell: pwsh
+        run: |
+          $api = 'http://localhost:8080/api'
+          $login = Invoke-RestMethod -Method Post "$api/auth/login" -ContentType 'application/json' -Body (@{ username = 'admin'; password = 'ci-admin-password-1' } | ConvertTo-Json)
+          $t = (Invoke-RestMethod -Method Post "$api/enroll" -Headers @{ authorization = "Bearer $($login.token)" } -ContentType 'application/json' -Body '{"label":"ci-win"}').token
+          "::add-mask::$t" | Write-Host
+          "ENROLL=$t" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "SESSION=$($login.token)" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - name: Install the agent (Windows PowerShell 5.1, same command the UI shows)
+        shell: powershell
+        run: |
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          $global:LASTEXITCODE = 0
+          & ([scriptblock]::Create((irm 'http://localhost:8080/install.ps1'))) -Token $env:ENROLL -Name 'ci-windows'
+          if ($global:LASTEXITCODE -eq 1) { throw 'the installer reported an error' }
+
+      - name: The agent reports real Windows data
+        shell: pwsh
+        run: |
+          $h = @{ authorization = "Bearer $env:SESSION" }
+          $a = $null
+          for ($i = 0; $i -lt 60; $i++) {
+            $o = Invoke-RestMethod http://localhost:8080/api/overview -Headers $h
+            $a = $o.agents | Where-Object { $_.name -eq 'ci-windows' -and $_.online -and $_.metrics } | Select-Object -First 1
+            if ($a) { break }
+            Start-Sleep 2
+          }
+          if (-not $a) { throw 'agent never reported metrics' }
+          # the first security scan (event log, firewall, ports...) takes a few seconds
+          $d = $null
+          for ($i = 0; $i -lt 60; $i++) {
+            $d = Invoke-RestMethod "http://localhost:8080/api/agents/$($a.id)" -Headers $h
+            if (@($d.ports).Count -gt 0) { break }
+            Start-Sleep 3
+          }
+          "os        : $($d.info.os)"
+          "platform  : $($d.info.platform)"
+          "cpu/mem/disk: $([int]$d.metrics.cpu)% / $([int]$d.metrics.mem)% / $([int]$d.metrics.disk)%"
+          "ports     : $(@($d.ports).Count)"
+          $d.findings | ForEach-Object { "  [$($_.severity)] $($_.check_id)  $($_.title)" }
+          if ($d.info.platform -ne 'win32') { throw 'platform should be win32' }
+          if ($d.info.os -notmatch 'Windows') { throw "unexpected OS string: $($d.info.os)" }
+          if (@($d.ports).Count -eq 0) { throw 'no listening ports were reported' }
+          if ($d.metrics.disk -le 0 -or $d.metrics.mem -le 0) { throw 'metrics look empty' }
+
+      - name: Re-running upgrades in place and keeps the identity
+        shell: powershell
+        run: |
+          $global:LASTEXITCODE = 0
+          & ([scriptblock]::Create((irm 'http://localhost:8080/install.ps1'))) -Name 'ci-windows'
+          if ($global:LASTEXITCODE -eq 1) { throw 'upgrade failed' }
+          $o = Invoke-RestMethod http://localhost:8080/api/overview -Headers @{ authorization = "Bearer $env:SESSION" }
+          if (@($o.agents).Count -ne 1) { throw "expected exactly one agent, got $(@($o.agents).Count)" }
+
+      - name: Uninstall removes everything
+        shell: powershell
+        run: |
+          $global:LASTEXITCODE = 0
+          & ([scriptblock]::Create((irm 'http://localhost:8080/install.ps1'))) -Uninstall -Purge
+          if (Get-ScheduledTask -TaskName OculyxAgent -ErrorAction SilentlyContinue) { throw 'scheduled task still present' }
+          if (Test-Path "$env:ProgramData\Oculyx\agent") { throw 'agent folder still present' }
+
+      - name: Logs (on failure)
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-Content "$env:RUNNER_TEMP\server.err" -Tail 40 -ErrorAction SilentlyContinue
+          Get-Content "$env:ProgramData\Oculyx\agent.log" -Tail 60 -ErrorAction SilentlyContinue

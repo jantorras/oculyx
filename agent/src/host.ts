@@ -2,6 +2,7 @@ import { readFileSync, statfsSync, existsSync } from 'node:fs';
 import { cpus, hostname, totalmem, freemem, arch, release, platform, uptime, loadavg } from 'node:os';
 import { join } from 'node:path';
 import type { HostInfo, MetricsSample } from './protocol.ts';
+import { netstatBytes } from './windows.ts';
 
 export const VERSION = '0.1.0';
 /** Prefix under which the host's filesystem is mounted when the agent runs in a container (e.g. /host). */
@@ -34,6 +35,7 @@ export function hostInfo(dockerAvailable: boolean): HostInfo {
     memTotal: totalmem(),
     docker: dockerAvailable,
     agentVersion: VERSION,
+    platform: platform(),
   };
 }
 
@@ -88,7 +90,7 @@ function memory(): { used: number; total: number } {
 
 function disk(): { used: number; total: number } {
   try {
-    const s = statfsSync(HOST_ROOT || (isLinux ? '/' : process.cwd().slice(0, 3)));
+    const s = statfsSync(HOST_ROOT || (isLinux ? '/' : `${process.env.SystemDrive ?? 'C:'}\\`));
     const total = (s.blocks - s.bfree + s.bavail) * s.bsize;
     return { used: (s.blocks - s.bfree) * s.bsize, total };
   } catch {
@@ -102,7 +104,7 @@ export async function collectMetrics(): Promise<MetricsSample> {
   if (lastCpu && now.total > lastCpu.total) cpu = ((now.busy - lastCpu.busy) / (now.total - lastCpu.total)) * 100;
   lastCpu = now;
 
-  const n = netTotals();
+  const n = (platform() === 'win32' ? await netstatBytes() : null) ?? netTotals();
   const at = Date.now();
   let rx = 0;
   let tx = 0;

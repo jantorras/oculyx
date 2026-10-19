@@ -134,4 +134,12 @@ export const es: Record<string, string> = {
   'containers.server': 'Servidor',
   'add.sudo_note': 'Funciona como root (p. ej. el shell de Proxmox) y con sudo en Ubuntu/Debian.',
   'containers.subtitle_one': '{running} de {total} contenedores en ejecución en {name}',
+  'add.os': 'Sistema operativo',
+  'add.os_linux_help': 'Debian, Ubuntu, Proxmox, RHEL y similares',
+  'add.os_windows_help': 'Windows 10/11 y Server 2016+. Se ejecuta como tarea programada bajo SYSTEM.',
+  'add.win_run_help': 'Abre PowerShell como administrador en el equipo Windows y pega esto. Descarga un Node.js portátil, instala el agente y lo conecta.',
+  'evt.rdp_failed': 'Inicios de sesión fallidos en Windows',
+  'evt.rdp_login': 'Inicios de sesión RDP',
+  'evt.win_admin_change': 'Cambios en Administradores',
+  'cat.win': 'Windows',
 };

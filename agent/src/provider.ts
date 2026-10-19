@@ -1,15 +1,25 @@
 import { collectMetrics, hostInfo } from './host.ts';
 import { containerAction, containerLogs, dockerAvailable, listContainers } from './docker.ts';
 import { SecurityScanner } from './security.ts';
+import { WindowsScanner, windowsInfo } from './windows.ts';
 import type { Provider } from './protocol.ts';
 
 /** Provider for a real host. Mutating actions stay disabled unless OCULYX_ALLOW_ACTIONS=true. */
 export async function createHostProvider(stateDir: string): Promise<Provider> {
   const docker = await dockerAvailable();
   const allowActions = process.env.OCULYX_ALLOW_ACTIONS === 'true';
-  const scanner = new SecurityScanner(stateDir, () => docker);
+  const win = process.platform === 'win32';
+  const scanner = win ? new WindowsScanner(stateDir) : new SecurityScanner(stateDir, () => docker);
   return {
-    info: async () => hostInfo(docker),
+    info: async () => {
+      const info = hostInfo(docker);
+      if (win) {
+        const w = await windowsInfo();
+        if (w?.caption) info.os = `${w.caption} (build ${w.build})`;
+        if (w?.cpu) info.cpuModel = w.cpu;
+      }
+      return info;
+    },
     metrics: collectMetrics,
     docker: async () => (docker ? listContainers() : null),
     security: () => scanner.scan(),

@@ -12,6 +12,7 @@
 - **Monitoring** — CPU, memory, disk, network and load per host, with history up to 7 days, threshold and offline alerts, webhook / Telegram notifications.
 - **Docker** — container inventory with live CPU/memory, logs, and start / stop / restart (opt-in per host).
 - **Security** — SSH and account hardening checks, exposed risky ports and port-change events, file integrity monitoring, SSH brute-force detection, sudo / login events, pending security updates, Docker posture (privileged, `docker.sock`, host network, root user, unpinned tags) and a security score per host.
+- **Windows agent** — metrics, Docker Desktop, and Windows-specific checks: Defender and firewall state, SMBv1, RDP without NLA, exposed RDP/SMB/WinRM/SQL ports, failed and RDP logons from the Security event log (brute-force detection), local Administrators changes, `hosts` file integrity, pending reboot, stale updates, accounts without password.
 - **Teams** — admin / operator / viewer roles, audit log, login rate limiting. UI in Catalan, Spanish and English, dark and light.
 - **Easy to add servers** — one command per host, with a live "waiting for connection" wizard in the UI.
 
@@ -74,6 +75,18 @@ curl -fsSL https://YOUR-OCULYX/install.sh | $(command -v sudo) bash -s -- --toke
 |---|---|---|
 | Docker container | *(default)*, `--install-docker` to install Docker | hosts that already run Docker |
 | System service | `--native` | Proxmox hosts, LXC containers, anything without Docker |
+
+### Windows (10/11, Server 2016+)
+
+Open **PowerShell as Administrator** on the machine and paste the command the UI shows:
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; & ([scriptblock]::Create((irm 'https://YOUR-OCULYX/install.ps1'))) -Token 'ocx_...' -Name 'my-pc'
+```
+
+It downloads a portable, checksum-verified Node.js and the agent from your server, and runs the agent as a scheduled task under SYSTEM (`ProgramData\Oculyx`, locked to Administrators). Same script upgrades it; `-Uninstall [-Purge]` removes it; `-AllowActions` enables Docker Desktop container control.
+
+### How the Linux installer works
 
 The installer checks requirements, downloads the agent from **your** server, starts it and confirms the connection. Re-running upgrades it; `--uninstall [--purge]` removes it; `--allow-actions` enables start/stop/restart of containers from the UI. Tokens are single-use and expire after 24 hours. Prefer to read it first? `curl -fsSL https://YOUR-OCULYX/install.sh | less`.
 

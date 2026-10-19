@@ -1,7 +1,7 @@
 import http from 'node:http';
 import type { ContainerInfo } from './protocol.ts';
 
-const SOCKET = process.env.DOCKER_SOCKET ?? '/var/run/docker.sock';
+const SOCKET = process.env.DOCKER_SOCKET ?? (process.platform === 'win32' ? '\\\\.\\pipe\\docker_engine' : '/var/run/docker.sock');
 
 /** Minimal Docker Engine API client over the unix socket (no dependencies). */
 function request(method: string, path: string, timeout = 8000): Promise<{ status: number; body: Buffer }> {

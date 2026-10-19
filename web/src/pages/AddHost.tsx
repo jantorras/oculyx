@@ -12,6 +12,7 @@ interface Fresh {
   allow: boolean;
   docker: boolean;
   native: boolean;
+  os: 'linux' | 'windows';
 }
 
 function copyText(text: string): Promise<void> {
@@ -38,6 +39,7 @@ export function AddHost() {
   const [allow, setAllow] = useState(false);
   const [docker, setDocker] = useState(true);
   const [native, setNative] = useState(false);
+  const [os, setOs] = useState<'linux' | 'windows'>('linux');
   const [fresh, setFresh] = useState<Fresh | null>(null);
   const [tab, setTab] = useState<'one' | 'inspect'>('one');
   const [copied, setCopied] = useState(false);
@@ -62,7 +64,7 @@ export function AddHost() {
     setError('');
     try {
       const r = await api<{ token: string; expires: number }>('/enroll', { body: { label } });
-      setFresh({ token: r.token, expires: r.expires, label, allow, docker: docker && !native, native });
+      setFresh({ token: r.token, expires: r.expires, label, allow, docker: docker && !native && os === 'linux', native: native && os === 'linux', os });
       setTab('one');
     } catch (err) {
       setError(t(`err.${(err as Error).message}`));
@@ -70,8 +72,14 @@ export function AddHost() {
   }
 
   const flags = (f: Fresh) => `--token ${f.token}${f.label ? ` --name ${f.label}` : ''}${f.native ? ' --native' : ''}${f.allow ? ' --allow-actions' : ''}${f.docker ? ' --install-docker' : ''}`;
-  const oneLiner = (f: Fresh) => `curl -fsSL ${base}/install.sh | $(command -v sudo) bash -s -- ${flags(f)}`;
-  const inspect = (f: Fresh) => `curl -fsSLo oculyx-install.sh ${base}/install.sh\nless oculyx-install.sh      # read it first (press q to quit)\n$(command -v sudo) bash oculyx-install.sh ${flags(f)}`;
+  const winArgs = (f: Fresh) => `-Token '${f.token}'${f.label ? ` -Name '${f.label}'` : ''}${f.allow ? ' -AllowActions' : ''}`;
+  const oneLiner = (f: Fresh) =>
+    f.os === 'windows'
+      ? `[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; & ([scriptblock]::Create((irm '${base}/install.ps1'))) ${winArgs(f)}`
+      : `curl -fsSL ${base}/install.sh | $(command -v sudo) bash -s -- ${flags(f)}`;
+  const inspect = (f: Fresh) => f.os === 'windows'
+    ? `irm '${base}/install.ps1' -OutFile oculyx-install.ps1\nnotepad oculyx-install.ps1      # read it first\npowershell -ExecutionPolicy Bypass -File .\\oculyx-install.ps1 ${winArgs(f)}`
+    : `curl -fsSLo oculyx-install.sh ${base}/install.sh\nless oculyx-install.sh      # read it first (press q to quit)\n$(command -v sudo) bash oculyx-install.sh ${flags(f)}`;
 
   const connected = status?.state === 'enrolled' && status.agent?.hasData;
   const expired = status?.state === 'expired';
@@ -134,6 +142,18 @@ export function AddHost() {
               <span id="name-help" className={nameBad ? 'error' : 'muted'} style={{ fontSize: 12 }}>{nameBad ? t('add.name_bad') : t('add.name_help')}</span>
             </label>
             <fieldset className="modes">
+              <legend>{t('add.os')}</legend>
+              <label className={`mode ${os === 'linux' ? 'on' : ''}`}>
+                <input type="radio" name="os" checked={os === 'linux'} onChange={() => setOs('linux')} />
+                <span><b>Linux</b><small>{t('add.os_linux_help')}</small></span>
+              </label>
+              <label className={`mode ${os === 'windows' ? 'on' : ''}`}>
+                <input type="radio" name="os" checked={os === 'windows'} onChange={() => setOs('windows')} />
+                <span><b>Windows</b><small>{t('add.os_windows_help')}</small></span>
+              </label>
+            </fieldset>
+            {os === 'linux' && (
+            <fieldset className="modes">
               <legend>{t('add.mode')}</legend>
               <label className={`mode ${!native ? 'on' : ''}`}>
                 <input type="radio" name="mode" checked={!native} onChange={() => setNative(false)} />
@@ -144,7 +164,8 @@ export function AddHost() {
                 <span><b>{t('add.mode_native')}</b><small>{t('add.mode_native_help')}</small></span>
               </label>
             </fieldset>
-            {!native && (
+            )}
+            {os === 'linux' && !native && (
               <label className="check">
                 <input type="checkbox" checked={docker} onChange={(e) => setDocker(e.target.checked)} />
                 <span><b>{t('add.docker')}</b><small>{t('add.docker_help')}</small></span>
@@ -162,7 +183,7 @@ export function AddHost() {
 
       {stage === 2 && fresh && (
         <Card title={t('add.run_title')} actions={<span className="muted" style={{ fontSize: 12.5 }}>{t('add.expires', { time: clock(fresh.expires) })}</span>}>
-          <p className="muted" style={{ marginTop: 0 }}>{t('add.run_help')} {t('add.sudo_note')}</p>
+          <p className="muted" style={{ marginTop: 0 }}>{fresh.os === 'windows' ? t('add.win_run_help') : `${t('add.run_help')} ${t('add.sudo_note')}`}</p>
           <div className="seg" role="tablist" style={{ marginBottom: 12 }}>
             <button role="tab" aria-selected={tab === 'one'} className={tab === 'one' ? 'active' : ''} onClick={() => setTab('one')}>{t('add.tab_one')}</button>
             <button role="tab" aria-selected={tab === 'inspect'} className={tab === 'inspect' ? 'active' : ''} onClick={() => setTab('inspect')}>{t('add.tab_inspect')}</button>

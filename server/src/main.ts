@@ -453,12 +453,17 @@ app.get('/healthz', async () => ({ ok: true }));
 
 // ---------- one-line installer + agent bundle (public: a fresh machine fetches them with plain curl) ----------
 const installTemplate = readFileSync(join(here, 'install.sh'), 'utf8');
+const installTemplatePs = readFileSync(join(here, 'install.ps1'), 'utf8');
 const bundle = agentBundle(AGENT_DIR);
 const originOf = (req: any) => {
   const proto = String(req.headers['x-forwarded-proto'] ?? req.protocol).split(',')[0].trim();
   const host = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? '').split(',')[0].trim();
   return `${proto}://${host}`;
 };
+app.get('/install.ps1', async (req, reply) => {
+  const url = safeServerUrl(db.setting('server.public_url'), safeServerUrl(originOf(req), 'http://localhost:' + PORT));
+  return reply.type('text/plain; charset=utf-8').header('cache-control', 'no-store').send(renderInstallScript(installTemplatePs, url));
+});
 app.get('/install.sh', async (req, reply) => {
   const url = safeServerUrl(db.setting('server.public_url'), safeServerUrl(originOf(req), 'http://localhost:' + PORT));
   return reply.type('text/x-shellscript; charset=utf-8').header('cache-control', 'no-store').send(renderInstallScript(installTemplate, url));
