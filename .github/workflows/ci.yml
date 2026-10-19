@@ -130,7 +130,8 @@ jobs:
           cache: npm
       - run: npm ci
 
-      - name: Start the server (as a scheduled task: plain background processes are killed when a step ends on Windows)
+      # A plain background process is killed when a step ends on Windows, so the test server runs as a scheduled task.
+      - name: Start the server
         shell: pwsh
         run: |
           $node = (Get-Command node).Source
