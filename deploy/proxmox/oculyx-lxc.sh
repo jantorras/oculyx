@@ -29,7 +29,7 @@ if [ -t 1 ]; then B=$'\033[1m'; G=$'\033[32m'; R=$'\033[31m'; Y=$'\033[33m'; N=$
 step() { printf '\n%s==>%s %s\n' "$B" "$N" "$*"; }
 ok()   { printf '  %s+%s %s\n' "$G" "$N" "$*"; }
 warn() { printf '  %s!%s %s\n' "$Y" "$N" "$*"; }
-die()  { printf '\n%sERROR:%s %s\n' "$R" "$N" "$*" >&2; exit 1; }
+die()  { printf '\n%sERROR:%s %b\n' "$R" "$N" "$*" >&2; exit 1; }
 
 usage() {
   cat <<EOF
@@ -151,8 +151,15 @@ done
 ok "Online"
 
 step "Installing Oculyx inside the container"
-pct exec "$CTID" -- bash -c "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates xz-utils >/dev/null"
-pct exec "$CTID" -- bash -c "curl -fsSL https://raw.githubusercontent.com/$REPO/main/deploy/install-server.sh | OCULYX_REPO='$REPO' OCULYX_VERSION='$VERSION' OCULYX_PORT='$PORT' bash" \
+# A brand-new container runs apt by itself on first boot and holds its lock; wait for it instead of failing.
+deps="no"; last=""
+for _ in $(seq 1 60); do
+  if last="$(pct exec "$CTID" -- env LC_ALL=C.UTF-8 DEBIAN_FRONTEND=noninteractive bash -c 'apt-get update -qq && apt-get install -y -qq curl ca-certificates xz-utils' 2>&1)"; then deps="yes"; break; fi
+  sleep 5
+done
+[ "$deps" = "yes" ] || die "Could not install base packages in the container:\n$last\nInspect with: pct enter $CTID"
+ok "Base packages ready"
+pct exec "$CTID" -- env LC_ALL=C.UTF-8 bash -c "curl -fsSL https://raw.githubusercontent.com/$REPO/main/deploy/install-server.sh | OCULYX_REPO='$REPO' OCULYX_VERSION='$VERSION' OCULYX_PORT='$PORT' bash" \
   || die "The installer failed. Inspect with: pct enter $CTID   (remove with: pct stop $CTID && pct destroy $CTID)"
 
 ip="$(pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}')"

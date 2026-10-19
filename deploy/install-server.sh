@@ -83,7 +83,15 @@ for c in curl tar xz ca-certificates; do
     *) command -v "$c" >/dev/null 2>&1 || need_pkgs="$need_pkgs $c" ;;
   esac
 done
-if [ -n "$need_pkgs" ]; then apt-get update -qq >/dev/null; apt-get install -y -qq $need_pkgs >/dev/null; fi
+if [ -n "$need_pkgs" ]; then
+  installed="no"
+  for _ in $(seq 1 60); do
+    # shellcheck disable=SC2086
+    if apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq $need_pkgs >/dev/null 2>&1; then installed="yes"; break; fi
+    sleep 5   # another apt process (e.g. first boot) holds the lock
+  done
+  [ "$installed" = "yes" ] || fail "Could not install:$need_pkgs (apt is busy or offline)."
+fi
 ok "curl, tar, xz"
 
 # Node.js >= 24: official tarball, checksum verified
