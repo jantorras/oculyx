@@ -1,0 +1,11 @@
+FROM node:24-slim
+ENV NODE_ENV=production OCULYX_STATE_DIR=/var/lib/oculyx
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY server/package.json server/
+COPY agent/package.json agent/
+COPY web/package.json web/
+RUN npm ci --omit=dev -w agent
+COPY agent agent
+VOLUME /var/lib/oculyx
+CMD ["node", "--disable-warning=ExperimentalWarning", "agent/src/main.ts"]

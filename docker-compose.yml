@@ -1,0 +1,21 @@
+# Oculyx server. Put TLS in front of it (Caddy below) before exposing it to the internet.
+services:
+  oculyx:
+    build: { context: ., dockerfile: deploy/Dockerfile.server }
+    restart: unless-stopped
+    environment:
+      OCULYX_TRUST_PROXY: "1"
+      # OCULYX_ADMIN_PASSWORD: change-me-please   # optional; otherwise printed once in `docker compose logs oculyx`
+    volumes: [oculyx-data:/data]
+    expose: ["8080"]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    # Replace oculyx.example.com with your domain (automatic HTTPS), or use `:80` for plain HTTP inside a trusted LAN.
+    command: caddy reverse-proxy --from ${OCULYX_DOMAIN:-:80} --to oculyx:8080
+    volumes: [caddy-data:/data]
+    depends_on: [oculyx]
+
+volumes: { oculyx-data: {}, caddy-data: {} }

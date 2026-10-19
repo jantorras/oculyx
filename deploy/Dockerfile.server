@@ -1,0 +1,26 @@
+FROM node:24-slim AS web
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY server/package.json server/
+COPY agent/package.json agent/
+COPY web/package.json web/
+RUN npm ci
+COPY web web
+RUN npm run build -w web
+
+FROM node:24-slim
+ENV NODE_ENV=production OCULYX_DATA=/data OCULYX_WEB=/app/web/dist OCULYX_AGENT_DIR=/app/agent
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY server/package.json server/
+COPY agent/package.json agent/
+COPY web/package.json web/
+RUN npm ci --omit=dev -w server
+COPY server server
+COPY agent agent
+COPY --from=web /app/web/dist web/dist
+USER node
+VOLUME /data
+EXPOSE 8080
+HEALTHCHECK CMD node -e "fetch('http://localhost:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "--disable-warning=ExperimentalWarning", "server/src/main.ts"]

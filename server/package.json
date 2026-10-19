@@ -1,0 +1,3 @@
+{ "name": "@oculyx/server", "private": true, "version": "0.1.0", "type": "module",
+  "dependencies": { "fastify": "^5.0.0", "@fastify/static": "^8.0.0", "ws": "^8.18.0" },
+  "devDependencies": { "@types/ws": "^8.5.0" } }

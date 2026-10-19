@@ -1,0 +1,18 @@
+# Run on each monitored Linux host:  OCULYX_SERVER=https://... OCULYX_ENROLL_TOKEN=ocx_... docker compose -f docker-compose.agent.yml up -d
+services:
+  oculyx-agent:
+    build: { context: ., dockerfile: deploy/Dockerfile.agent }
+    restart: unless-stopped
+    network_mode: host          # sees the host's real interfaces and listening ports
+    pid: host
+    environment:
+      OCULYX_SERVER: ${OCULYX_SERVER}
+      OCULYX_ENROLL_TOKEN: ${OCULYX_ENROLL_TOKEN:-}
+      OCULYX_NAME: ${OCULYX_NAME:-}
+      HOST_ROOT: /host
+      OCULYX_ALLOW_ACTIONS: ${OCULYX_ALLOW_ACTIONS:-false}   # true = allow start/stop/restart from the UI
+    volumes:
+      - /:/host:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - oculyx-agent:/var/lib/oculyx
+volumes: { oculyx-agent: {} }

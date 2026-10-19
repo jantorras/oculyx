@@ -1,0 +1,15 @@
+{
+  "name": "oculyx",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Oculyx - self-hosted server monitoring, security and Docker management",
+  "workspaces": ["server", "agent", "web"],
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "typecheck": "tsc -p server --noEmit && tsc -p agent --noEmit && tsc -p web --noEmit",
+    "build:web": "npm run build -w web",
+    "start": "node server/src/main.ts",
+    "demo": "node scripts/demo.mjs"
+  },
+  "devDependencies": { "typescript": "^5.9.0", "@types/node": "^24.0.0" }
+}
