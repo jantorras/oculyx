@@ -130,15 +130,24 @@ jobs:
           cache: npm
       - run: npm ci
 
-      - name: Start the server
+      - name: Start the server (as a scheduled task: plain background processes are killed when a step ends on Windows)
         shell: pwsh
-        env:
-          OCULYX_ADMIN_PASSWORD: ci-admin-password-1
-          OCULYX_DATA: ${{ runner.temp }}\oculyx-data
-          PORT: '8080'
         run: |
-          Start-Process node -ArgumentList '--disable-warning=ExperimentalWarning','server/src/main.ts' -RedirectStandardOutput "$env:RUNNER_TEMP\server.log" -RedirectStandardError "$env:RUNNER_TEMP\server.err" -WindowStyle Hidden
-          for ($i = 0; $i -lt 30; $i++) { try { Invoke-RestMethod http://localhost:8080/healthz | Out-Null; break } catch { Start-Sleep 1 } }
+          $node = (Get-Command node).Source
+          $wd = (Get-Location).Path
+          $cmdFile = Join-Path $env:RUNNER_TEMP 'server.cmd'
+          @(
+            '@echo off',
+            'set OCULYX_ADMIN_PASSWORD=ci-admin-password-1',
+            "set OCULYX_DATA=$env:RUNNER_TEMP\oculyx-data",
+            'set PORT=8080',
+            "cd /d $wd",
+            "`"$node`" --disable-warning=ExperimentalWarning server\src\main.ts > `"$env:RUNNER_TEMP\server.log`" 2>&1"
+          ) | Set-Content -Encoding ascii $cmdFile
+          $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c `"$cmdFile`""
+          Register-ScheduledTask -TaskName OculyxServerCI -Action $action -Principal (New-ScheduledTaskPrincipal -UserId 'SYSTEM' -RunLevel Highest) -Force | Out-Null
+          Start-ScheduledTask -TaskName OculyxServerCI
+          for ($i = 0; $i -lt 40; $i++) { try { Invoke-RestMethod http://localhost:8080/healthz | Out-Null; break } catch { Start-Sleep 1 } }
           Invoke-RestMethod http://localhost:8080/healthz
 
       - name: Create an enrollment token
@@ -209,5 +218,5 @@ jobs:
         if: failure()
         shell: pwsh
         run: |
-          Get-Content "$env:RUNNER_TEMP\server.err" -Tail 40 -ErrorAction SilentlyContinue
+          Get-Content "$env:RUNNER_TEMP\server.log" -Tail 40 -ErrorAction SilentlyContinue
           Get-Content "$env:ProgramData\Oculyx\agent.log" -Tail 60 -ErrorAction SilentlyContinue
