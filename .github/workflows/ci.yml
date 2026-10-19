@@ -47,6 +47,7 @@ jobs:
           grep -o 'password  [^ ]*' install.log || true
           PW="$(sudo journalctl -u oculyx --no-pager -o cat | grep -o 'with password: .*' | tail -1 | sed 's/^with password: //')"
           test -n "$PW"
+          echo "::add-mask::$PW"
           echo "ADMIN_PW=$PW" >> "$GITHUB_ENV"
           curl -fsS http://localhost:8080/healthz
 
@@ -100,7 +101,8 @@ jobs:
       - name: Upgrade keeps the data and signs in with the same password
         run: |
           sudo OCULYX_TARBALL="$PWD/oculyx.tar.gz" bash deploy/install-server.sh
-          ls /var/lib/oculyx/backups
+          sudo ls /var/lib/oculyx/backups | head
+          sudo ls /var/lib/oculyx/backups | grep -q oculyx.db
           curl -fsS -X POST http://localhost:8080/api/auth/login -H 'content-type: application/json' -d "{\"username\":\"admin\",\"password\":\"$ADMIN_PW\"}" | jq -e .token >/dev/null
           test "$(curl -fsS http://localhost:8080/api/overview -H "authorization: Bearer $(curl -fsS -X POST http://localhost:8080/api/auth/login -H 'content-type: application/json' -d "{\"username\":\"admin\",\"password\":\"$ADMIN_PW\"}" | jq -r .token)" | jq '.agents | length')" -ge 2
 

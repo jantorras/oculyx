@@ -95,7 +95,10 @@ fi
 ok "curl, tar, xz"
 
 # Node.js >= 24: official tarball, checksum verified
-if command -v node >/dev/null 2>&1 && [ "$(node -p 'process.versions.node.split(".")[0]')" -ge 24 ]; then
+node_major() { "$1" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0; }
+if [ -x "$NODE_DIR/bin/node" ] && [ "$(node_major "$NODE_DIR/bin/node")" -ge 24 ]; then
+  NODE_BIN="$NODE_DIR/bin/node"; NPM_BIN="$NODE_DIR/bin/npm"; ok "Node.js $("$NODE_BIN" -v) (already installed)"
+elif command -v node >/dev/null 2>&1 && [ "$(node_major "$(command -v node)")" -ge 24 ]; then
   NODE_BIN="$(command -v node)"; NPM_BIN="$(command -v npm)"; ok "Node.js $(node -v)"
 else
   case "$(uname -m)" in x86_64) arch="x64" ;; aarch64|arm64) arch="arm64" ;; *) fail "Unsupported CPU architecture: $(uname -m)" ;; esac

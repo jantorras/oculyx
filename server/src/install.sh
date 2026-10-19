@@ -108,7 +108,11 @@ ensure_xz() {
 
 # Node.js >= 24 (the agent runs TypeScript directly). Uses the official tarball, checksum verified.
 ensure_node() {
-  if command -v node >/dev/null 2>&1 && [ "$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -ge 24 ]; then
+  node_major() { "$1" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0; }
+  if [ -x "$NODE_DIR/bin/node" ] && [ "$(node_major "$NODE_DIR/bin/node")" -ge 24 ]; then
+    NODE_BIN="$NODE_DIR/bin/node"; NPM_BIN="$NODE_DIR/bin/npm"; ok "Node.js $("$NODE_BIN" -v) (already installed)"; return 0
+  fi
+  if command -v node >/dev/null 2>&1 && [ "$(node_major "$(command -v node)")" -ge 24 ]; then
     NODE_BIN="$(command -v node)"; NPM_BIN="$(command -v npm)"; ok "Node.js $(node -v)"; return 0
   fi
   if ldd --version 2>&1 | grep -qi musl; then fail "Alpine/musl is not supported in native mode. Use Docker mode or a Debian/Ubuntu/RHEL-family host."; fi
