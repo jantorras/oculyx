@@ -1,3 +1,4 @@
+import { AiSettings } from './AiSettings';
 import { useState } from 'react';
 import { api, usePoll, clock, ago, getToken } from '../lib';
 import { useT } from '../i18n';
@@ -9,7 +10,7 @@ export function Settings({ tab: tabParam }: { tab?: string }) {
   const t = useT();
   const user = useUser();
   const isAdmin = user.role === 'admin';
-  const tabs = isAdmin ? ['enroll', 'users', 'notify', 'detect', 'sshkeys', 'domain', 'audit', 'account'] : ['account'];
+  const tabs = isAdmin ? ['enroll', 'users', 'notify', 'detect', 'ai', 'sshkeys', 'domain', 'audit', 'account'] : ['account'];
   const tab = tabs.includes(tabParam ?? '') ? tabParam! : tabs[0];
   return (
     <>
@@ -21,6 +22,7 @@ export function Settings({ tab: tabParam }: { tab?: string }) {
       {tab === 'users' && <Users />}
       {tab === 'notify' && <Notify />}
       {tab === 'detect' && <Detect />}
+      {tab === 'ai' && <AiSettings />}
       {tab === 'sshkeys' && <SshKeys />}
       {tab === 'domain' && <Domain />}
       {tab === 'audit' && <Audit />}

@@ -8,6 +8,8 @@ import { Db } from './db.ts';
 import { Alerts, OFFLINE_AFTER_MS, thresholds, DEFAULT_THRESHOLDS } from './alerts.ts';
 import { Hub } from './hub.ts';
 import { notify } from './notify.ts';
+import { Ai, AiError, providerDefaults } from './ai.ts';
+import { TelegramBot } from './telegram.ts';
 import { Tunnel, validTunnelToken, validHostname } from './tunnel.ts';
 import { RULES, ruleConfig } from './rules.ts';
 import { KeyVault, generateKey, importKey, connect, exec, shell, loadAccess, SshError } from './ssh.ts';
@@ -353,17 +355,85 @@ app.get('/api/agents/:id/admin', admin, async (req, reply) => {
     return reply.code(502).send({ error: (e as Error).message });
   }
 });
+/** Runs one named administration operation on a host and audits it (used by the panel, the AI confirm button and the Telegram bot). */
+async function runAdmin(id: number, op: string, args: Record<string, unknown>, who: string, ip: string): Promise<{ steps: string[] }> {
+  try {
+    const protectUser = loadAccess(db, id)?.user;
+    const out = await hub.command(id, 'admin.apply', { op, args, protectUser }, 1_300_000);
+    audit(who, `admin.${op}`, `${id}:${JSON.stringify(args).slice(0, 120)}`, ip);
+    return out;
+  } catch (e) {
+    audit(who, 'admin.failed', `${id}:${op}`, ip);
+    throw e;
+  }
+}
 app.post('/api/agents/:id/admin', admin, async (req, reply) => {
   const id = Number((req.params as any).id);
   const { op, args } = (req.body ?? {}) as { op?: string; args?: Record<string, unknown> };
   if (!/^[a-z]+\.[a-z-]{2,24}$/.test(String(op ?? ''))) return reply.code(400).send({ error: 'bad_request' });
   try {
-    const protectUser = loadAccess(db, id)?.user;
-    const out = await hub.command(id, 'admin.apply', { op, args: args ?? {}, protectUser }, 1_300_000);
-    audit(req.user!.username, `admin.${op}`, `${id}:${JSON.stringify(args ?? {}).slice(0, 120)}`, req.ip);
-    return out;
+    return await runAdmin(id, String(op), args ?? {}, req.user!.username, req.ip);
   } catch (e) {
-    audit(req.user!.username, 'admin.failed', `${id}:${op}`, req.ip);
+    return reply.code(502).send({ error: (e as Error).message });
+  }
+});
+
+// ---------- AI assistant: alert explanations, chat, daily digest, Telegram bot ----------
+const ai = new Ai({ db, vault, agents: () => db.all('SELECT * FROM agents ORDER BY name').map((a) => agentView(a)), notify: (n) => notify(db, n) });
+alerts.explain = (a) => ai.explainAlert(a);
+const bot = new TelegramBot({
+  db, ai,
+  status: () => ai.fleetText(),
+  alertsText: () => ai.alertsText(),
+  run: async (p) => `Done on ${p.host}: ${(await runAdmin(p.agentId, p.op, p.args, 'telegram', 'telegram')).steps.join(' · ')}`,
+});
+const aiError = (e: unknown, reply: any) => {
+  if (e instanceof AiError) return reply.code(e.code === 'bad_request' ? 400 : e.code === 'disabled' ? 409 : 502).send({ error: `ai_${e.code}`, message: e.message });
+  return reply.code(500).send({ error: 'ai_error', message: (e as Error).message });
+};
+const AI_BOOL: Record<string, string> = { enabled: 'ai.enabled', alerts: 'ai.alerts', telegram: 'ai.telegram' };
+const AI_TEXT: Record<string, string> = { provider: 'ai.provider', model: 'ai.model', baseUrl: 'ai.base_url', priceIn: 'ai.price_in', priceOut: 'ai.price_out', capMonth: 'ai.cap_month', alertMinSeverity: 'ai.alert_min_severity', digestHour: 'ai.digest_hour', language: 'ai.language' };
+app.get('/api/ai/status', viewer, async () => ({ ready: ai.ready(), enabled: ai.config().enabled }));
+app.get('/api/ai/settings', admin, async () => {
+  const c = ai.config();
+  return { ...c, apiKey: undefined, hasKey: !!c.apiKey, usage: ai.usage(), defaults: providerDefaults, telegramConfigured: !!(db.setting('notify.telegram_token') && db.setting('notify.telegram_chat')) };
+});
+app.put('/api/ai/settings', admin, async (req) => {
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  for (const [k, key] of Object.entries(AI_BOOL)) if (k in b) db.setSetting(key, b[k] ? '1' : '0');
+  for (const [k, key] of Object.entries(AI_TEXT)) if (k in b) db.setSetting(key, String(b[k] ?? '').trim());
+  if (typeof b.apiKey === 'string' && b.apiKey.trim()) db.setSetting('ai.api_key_enc', vault.seal(b.apiKey.trim()));
+  if (b.clearKey === true) db.setSetting('ai.api_key_enc', '');
+  audit(req.user!.username, 'ai.settings', undefined, req.ip);
+  return { ok: true };
+});
+app.post('/api/ai/test', admin, async (req, reply) => {
+  try { return { ok: true, reply: await ai.test(), usage: ai.usage() }; } catch (e) { return aiError(e, reply); }
+});
+app.post('/api/ai/digest', admin, async (req, reply) => {
+  try { return { ok: true, text: await ai.sendDigest() }; } catch (e) { return aiError(e, reply); }
+});
+const chatHits = new Map<string, number[]>();
+app.post('/api/ai/chat', viewer, async (req, reply) => {
+  const who = req.user!.username;
+  const hits = (chatHits.get(who) ?? []).filter((t) => Date.now() - t < 300_000);
+  if (hits.length >= 20) return reply.code(429).send({ error: 'ai_rate', message: 'Too many questions, wait a few minutes.' });
+  chatHits.set(who, [...hits, Date.now()]);
+  const b = (req.body ?? {}) as { messages?: { role: string; content: string }[]; language?: string };
+  const messages = (b.messages ?? []).filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').slice(-8) as { role: 'user' | 'assistant'; content: string }[];
+  try {
+    const r = await ai.chat(messages, b.language);
+    return { reply: r.reply, proposals: r.proposals.map((p) => ({ id: p.id, agentId: p.agentId, host: p.host, op: p.op, args: p.args, reason: p.reason })), usage: ai.usage() };
+  } catch (e) { return aiError(e, reply); }
+});
+app.post('/api/ai/proposals/:id/confirm', admin, async (req, reply) => {
+  const p = ai.proposals.get(String((req.params as any).id));
+  if (!p || p.used || Date.now() - p.created > 3600_000) return reply.code(404).send({ error: 'proposal_expired' });
+  p.used = true;
+  try {
+    const out = await runAdmin(p.agentId, p.op, p.args, req.user!.username, req.ip);
+    return { ok: true, steps: out.steps };
+  } catch (e) {
     return reply.code(502).send({ error: (e as Error).message });
   }
 });
@@ -977,5 +1047,7 @@ setInterval(() => {
 }, 3600_000);
 
 await app.listen({ port: PORT, host: process.env.HOST ?? '0.0.0.0' });
+bot.start();
+ai.startDigest();
 tunnel.apply();
 for (const sig of ['SIGTERM', 'SIGINT'] as const) process.once(sig, () => { tunnel.stop(); process.exit(0); });

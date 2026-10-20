@@ -12,6 +12,7 @@ import { Events } from './pages/Events';
 import { Settings } from './pages/Settings';
 import { Servers } from './pages/Servers';
 import { Overlays } from './components/overlay';
+import { Assistant } from './pages/Assistant';
 
 export interface User {
   id: number;
@@ -71,6 +72,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
     ['/servers', 'nav.servers', Icon.overview],
     ['/containers', 'nav.containers', Icon.docker],
     ['/security', 'nav.security', Icon.shield],
+    ['/assistant', 'nav.assistant', Icon.chat],
     ['/alerts', 'nav.alerts', Icon.bell],
     ['/events', 'nav.events', Icon.log],
     ['/settings', 'nav.settings', Icon.gear],
@@ -87,6 +89,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
   else if (route === '/servers') page = <Servers />;
   else if (route === '/containers') page = <Containers />;
   else if (route === '/security') page = <Security />;
+  else if (route === '/assistant') page = <Assistant />;
   else if (route === '/alerts') page = <Alerts />;
   else if (route === '/events') page = <Events />;
   else if (route.startsWith('/settings')) page = <Settings tab={route.split('/')[2]} />;

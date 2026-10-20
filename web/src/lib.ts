@@ -19,9 +19,12 @@ export const setToken = (t: string | null) => {
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /** human readable explanation from the server, when it sent one */
+  detail?: string;
+  constructor(status: number, message: string, detail?: string) {
     super(message);
     this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -37,7 +40,7 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
     setToken(null);
     location.reload();
   }
-  if (!res.ok) throw new ApiError(res.status, data.error ?? 'error');
+  if (!res.ok) throw new ApiError(res.status, data.error ?? 'error', typeof data.message === 'string' ? data.message : undefined);
   return data;
 }
 

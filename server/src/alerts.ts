@@ -35,10 +35,19 @@ export class Alerts {
     this.send(agentId, rule, severity, message);
   }
 
+  /** set by main: adds a short AI explanation to important alerts */
+  explain?: (a: { agentId: number; host: string; rule: string; severity: string; message: string }) => Promise<string>;
+
   private send(agentId: number, rule: string, severity: string, message: string) {
     const min = this.db.setting('notify.min_severity', 'low');
     if (sevRank(severity) < sevRank(min)) return;
-    void notify(this.db, { severity, title: `${this.agentName(agentId)}: ${rule.split(':')[0].replaceAll('_', ' ')}`, body: message });
+    const host = this.agentName(agentId);
+    void (async () => {
+      const why = this.explain ? await this.explain({ agentId, host, rule, severity, message }) : '';
+      await notify(this.db, { severity, title: `${host}: ${rule.split(':')[0].replaceAll('_', ' ')}`, body: why ? `${message}
+
+${why}` : message });
+    })();
   }
 
   /** Alert for a one-off security event. One open alert per rule+key, so repeated noise does not pile up. */

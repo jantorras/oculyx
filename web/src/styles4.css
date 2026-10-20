@@ -196,3 +196,23 @@ table.rows td.act { text-align: right; white-space: nowrap; width: 1%; }
 .menu .btn svg { width: 16px; height: 16px; display: block; }
 .btn.icon { width: 30px; height: 28px; padding: 0; justify-content: center; }
 .btn.icon svg { width: 16px; height: 16px; max-width: none; flex: none; }
+
+/* ---------- assistant chat and AI settings ---------- */
+.chat { max-width: 820px; display: grid; grid-template-rows: auto auto 1fr auto auto; min-height: calc(100dvh - 90px); }
+.chat-log { display: grid; gap: 18px; align-content: start; padding: 6px 2px 18px; }
+.chat-empty { display: grid; gap: 14px; padding: 40px 0; justify-items: start; }
+.ideas { display: flex; gap: 8px; flex-wrap: wrap; }
+.turn { display: grid; gap: 4px; }
+.turn .who { font-size: 12px; color: var(--muted); font-weight: 500; }
+.turn .bubble { white-space: pre-wrap; line-height: 1.55; max-width: 72ch; }
+.turn.user .bubble { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; justify-self: start; }
+.turn.err .bubble { color: var(--bad); }
+.bubble.typing { display: inline-flex; gap: 4px; padding: 6px 0; }
+.bubble.typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1.1s infinite ease-in-out; }
+.bubble.typing i:nth-child(2) { animation-delay: 0.15s; } .bubble.typing i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+.proposal { display: flex; align-items: center; gap: 14px; border: 1px solid var(--line-strong); border-left: 3px solid var(--accent); border-radius: 8px; background: var(--surface); padding: 10px 12px; max-width: 72ch; margin-top: 6px; }
+.p-title { font-size: 13.5px; }
+.chat-input { position: sticky; bottom: 0; display: flex; gap: 8px; align-items: flex-end; background: var(--bg); padding: 10px 0 0; }
+.chat-input textarea { flex: 1; resize: none; min-height: 40px; max-height: 160px; padding: 9px 12px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--surface); field-sizing: content; }
+.optrow { display: flex; align-items: center; gap: 14px; cursor: pointer; }

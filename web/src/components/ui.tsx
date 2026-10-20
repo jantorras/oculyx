@@ -10,6 +10,7 @@ const I = (d: string) => (
 export const Icon = {
   overview: I('M3 12h4l3-8 4 16 3-8h4'),
   hosts: I('M4 5h16v6H4zM4 13h16v6H4zM8 8h.01M8 16h.01'),
+  chat: I('M21 12a8 8 0 01-11.7 7.1L4 20l1-4.6A8 8 0 1121 12zM8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01'),
   docker: I('M3 13h18M5 13V9h3v4M9 13V9h3v4M13 13V9h3v4M9 9V6h3v3M2 13c1 5 5 7 10 7 6 0 9-3 10-7'),
   shield: I('M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z'),
   bell: I('M6 9a6 6 0 1112 0c0 6 2 7 2 7H4s2-1 2-7M10 20a2 2 0 004 0'),

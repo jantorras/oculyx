@@ -137,6 +137,17 @@ The server runs `cloudflared` itself and shows the tunnel status. Generated agen
 
 **Detection** works from the auth log or the journal (Debian 12 has no `auth.log`), `/proc`, and file baselines kept by the agent. Keys you deploy from the panel are not reported as intruders; keys added behind its back are. The first 24 hours of logins only teach the panel what is normal.
 
+## AI assistant (optional)
+
+Turn it on under *Settings, AI*. Bring your own provider: **Claude** (the small, cheap model is the default), **OpenAI or any compatible API** (OpenRouter, Groq, Gemini...) or **Ollama** on your own network for zero cost and full privacy.
+
+- **Explained alerts:** important notifications get two or three sentences of context and a first thing to check.
+- **Assistant chat** in the panel and as a **Telegram bot**: ask which servers need attention, who logged in lately, what to fix first. `/status` and `/alerts` work without AI.
+- **Proposes, never executes:** the assistant can suggest blocking an IP or restarting a service; an admin confirms with a button, and it is audited like any other action.
+- **Cheap by design:** short prompts, compact data lookups, capped answers, a monthly budget that switches the AI off when reached, and an optional daily digest instead of many messages.
+
+The data the model needs (host names, addresses, alerts, events) goes to the provider you choose. API keys are stored encrypted and never shown again.
+
 ## Add servers to monitor
 
 In the web UI click **Add server**, name it, and paste the command on the host:
