@@ -3,6 +3,7 @@ import { api, usePoll, clock } from '../lib';
 import { useT } from '../i18n';
 import { Card, Empty } from '../components/ui';
 import { TerminalModal } from '../components/Terminal';
+import { ask } from '../components/overlay';
 
 /** Per-host SSH: pick a key, put it on the host, test it, open a terminal, and see who else holds a key. */
 export function SshAccess({ agentId, name, onGoSecurity }: { agentId: number; name: string; onGoSecurity: () => void }) {
@@ -119,7 +120,7 @@ export function SshAccess({ agentId, name, onGoSecurity }: { agentId: number; na
             <div className="row wrap" style={{ gap: 8, alignItems: 'center' }}>
               <span className="pill" style={{ color: pwOff ? 'var(--ok)' : undefined }}>{pwOff ? t('sshw.pw_off') : t('sshw.pw_on')}</span>
               {pwOff
-                ? <button className="btn" disabled={!canChange || !!busy} onClick={() => confirm(t('ssh.confirm_revoke')) && unlock()}>{t('sshw.pw_btn_on')}</button>
+                ? <button className="btn" disabled={!canChange || !!busy} onClick={() => void ask({ title: t('sshw.pw_btn_on'), confirm: t('sshw.pw_btn_on') }).then(async (ok) => { if (ok) await unlock(); })}>{t('sshw.pw_btn_on')}</button>
                 : <button className="btn primary" disabled={!ready || !canChange || !!busy} onClick={() => lock({ passwords: true, root: rootMode === 'yes' })}>{busy === 'lock' ? t('sshw.working') : t('sshw.pw_btn_off')}</button>}
               {!ready && !pwOff && <span className="muted" style={{ fontSize: 12.5 }}>{t('sshw.need_steps')}</span>}
             </div>
@@ -170,7 +171,7 @@ export function SshAccess({ agentId, name, onGoSecurity }: { agentId: number; na
                 <td style={{ fontWeight: 600 }}>{k.user}</td>
                 <td className="mono muted" style={{ fontSize: 12 }}>{k.fingerprint}{(keys ?? []).some((x) => x.fingerprint === k.fingerprint) && <span className="pill" style={{ marginLeft: 8 }}>{t('ssh.panel_key')}</span>}</td>
                 <td className="muted">{k.comment || '-'}</td>
-                <td className="r">{data.canHarden && <button className="btn sm danger" disabled={!!busy} onClick={() => confirm(t('ssh.confirm_revoke')) && run('revoke', async () => { await api(`/agents/${agentId}/ssh/revoke`, { body: { user: k.user, fingerprint: k.fingerprint } }); })}>{t('ssh.revoke')}</button>}</td>
+                <td className="r">{data.canHarden && <button className="btn sm danger" disabled={!!busy} onClick={() => void ask({ title: t('ssh.revoke'), body: t('ssh.confirm_revoke'), confirm: t('ssh.revoke'), danger: true }).then(async (ok) => { if (ok) await run('revoke', async () => { await api(`/agents/${agentId}/ssh/revoke`, { body: { user: k.user, fingerprint: k.fingerprint } }); }); })}>{t('ssh.revoke')}</button>}</td>
               </tr>
             ))}</tbody>
           </table></div>

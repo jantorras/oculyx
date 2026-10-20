@@ -11,6 +11,7 @@ import { Alerts } from './pages/Alerts';
 import { Events } from './pages/Events';
 import { Settings } from './pages/Settings';
 import { Servers } from './pages/Servers';
+import { Overlays } from './components/overlay';
 
 export interface User {
   id: number;
@@ -142,6 +143,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
         </button>
         {page}
       </main>
+      <Overlays />
     </div>
   );
 }

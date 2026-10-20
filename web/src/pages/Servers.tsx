@@ -3,6 +3,7 @@ import { api, usePoll, ago, clock } from '../lib';
 import { useT } from '../i18n';
 import { useUser } from '../App';
 import { Card, Empty, Modal, Skeleton, StatusDot } from '../components/ui';
+import { Menu } from '../components/overlay';
 
 /** Fleet administration: every host that ever connected, with rename and (bulk) removal. */
 export function Servers() {
@@ -132,8 +133,12 @@ export function Servers() {
                           {a.outdated && (a.online && a.info?.canHarden
                             ? <button className="btn sm primary" disabled={busy} onClick={() => update([a.id])}>{t('servers.update')}</button>
                             : <button className="btn sm" onClick={() => setManual(a)}>{t('servers.update')}</button>)}
-                          <button className="btn sm" onClick={() => setRename({ id: a.id, name: a.name })}>{t('servers.rename')}</button>
-                          <button className="btn sm danger" onClick={() => { setSel(new Set([a.id])); setConfirm(true); }}>{t('common.delete')}</button>
+                          <Menu label={t('adm.more')} items={[
+                            { label: t('servers.open'), onClick: () => { location.hash = `/hosts/${a.id}`; } },
+                            { label: t('servers.rename'), onClick: () => setRename({ id: a.id, name: a.name }) },
+                            'sep',
+                            { label: t('common.delete'), danger: true, onClick: () => { setSel(new Set([a.id])); setConfirm(true); } },
+                          ]} />
                         </div>
                       </td>
                     )}
