@@ -19,6 +19,8 @@ RUN npm ci --omit=dev -w server
 COPY server server
 COPY agent agent
 COPY --from=web /app/web/dist web/dist
+# optional: lets the web UI publish the server through a Cloudflare Tunnel
+COPY --from=cloudflare/cloudflared:latest /usr/local/bin/cloudflared /usr/local/bin/cloudflared
 USER node
 VOLUME /data
 EXPOSE 8080

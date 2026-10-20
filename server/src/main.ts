@@ -8,6 +8,7 @@ import { Db } from './db.ts';
 import { Alerts, OFFLINE_AFTER_MS, thresholds, DEFAULT_THRESHOLDS } from './alerts.ts';
 import { Hub } from './hub.ts';
 import { notify } from './notify.ts';
+import { Tunnel, validTunnelToken, validHostname } from './tunnel.ts';
 import { agentBundle, renderInstallScript, safeServerUrl, stampExe } from './installer.ts';
 import { hashPassword, verifyPassword, loadSecret, signToken, verifyToken, randomToken, sha256, hasRole, LoginLimiter, type Role } from './auth.ts';
 
@@ -26,8 +27,9 @@ const secret = loadSecret(DATA_DIR);
 const alerts = new Alerts(db);
 const hub = new Hub(db, alerts);
 const limiter = new LoginLimiter();
+const tunnel = new Tunnel(db);
 
-const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, trustProxy: process.env.OCULYX_TRUST_PROXY === '1', bodyLimit: 1_000_000 });
+const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, trustProxy: process.env.OCULYX_TRUST_PROXY === '1' ? true : ['127.0.0.1', '::1'], bodyLimit: 1_000_000 });
 
 // ---------- bootstrap admin ----------
 if (!db.get('SELECT 1 AS x FROM users LIMIT 1')) {
@@ -450,6 +452,46 @@ app.post('/api/settings/test-notify', admin, async () => {
   return { ok: true };
 });
 
+// ---------- Cloudflare Tunnel (domain access configured from the web UI) ----------
+const tunnelInfo = () => ({
+  available: tunnel.binary() !== null,
+  enabled: db.setting('cloudflare.enabled') === '1',
+  hasToken: db.setting('cloudflare.token') !== '',
+  hostname: db.setting('cloudflare.hostname'),
+  state: tunnel.state,
+  log: tunnel.lines.slice(-12),
+});
+app.get('/api/tunnel', admin, async () => tunnelInfo());
+app.put('/api/tunnel', admin, async (req, reply) => {
+  const b = (req.body ?? {}) as { token?: string; hostname?: string; enabled?: boolean };
+  if (typeof b.token === 'string' && b.token.trim()) {
+    const tok = b.token.trim().replace(/^.*\s/, '');   // accept the whole "cloudflared service install <token>" line
+    if (!validTunnelToken(tok)) return reply.code(400).send({ error: 'bad_tunnel_token' });
+    db.setSetting('cloudflare.token', tok);
+  }
+  if (typeof b.hostname === 'string') {
+    const h = b.hostname.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (h && !validHostname(h)) return reply.code(400).send({ error: 'bad_hostname' });
+    db.setSetting('cloudflare.hostname', h);
+    // generated install commands should point agents at the public address
+    if (h) db.setSetting('server.public_url', 'https://' + h);
+  }
+  if (typeof b.enabled === 'boolean') {
+    if (b.enabled && !db.setting('cloudflare.token')) return reply.code(400).send({ error: 'no_tunnel_token' });
+    if (b.enabled && !tunnel.binary()) return reply.code(400).send({ error: 'no_cloudflared' });
+    db.setSetting('cloudflare.enabled', b.enabled ? '1' : '0');
+  }
+  tunnel.apply();
+  audit(req.user!.username, 'tunnel.update', db.setting('cloudflare.enabled') === '1' ? 'on' : 'off', req.ip);
+  return tunnelInfo();
+});
+app.delete('/api/tunnel', admin, async (req) => {
+  for (const k of ['cloudflare.token', 'cloudflare.enabled']) db.setSetting(k, '');
+  tunnel.apply();
+  audit(req.user!.username, 'tunnel.remove', undefined, req.ip);
+  return tunnelInfo();
+});
+
 app.get('/api/audit', admin, async () => db.all('SELECT * FROM audit ORDER BY ts DESC LIMIT 300'));
 
 // ---------- agent enrollment (public, token-gated) ----------
@@ -527,3 +569,5 @@ setInterval(() => {
 }, 3600_000);
 
 await app.listen({ port: PORT, host: process.env.HOST ?? '0.0.0.0' });
+tunnel.apply();
+for (const sig of ['SIGTERM', 'SIGINT'] as const) process.once(sig, () => { tunnel.stop(); process.exit(0); });

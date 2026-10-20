@@ -117,6 +117,20 @@ else
 fi
 PATH="$(dirname "$NODE_BIN"):$PATH"; export PATH
 
+# cloudflared: lets the web UI publish the server on a domain through a Cloudflare Tunnel (optional)
+if [ ! -x /opt/cloudflared/cloudflared ]; then
+  case "$(uname -m)" in x86_64) cfarch="amd64" ;; aarch64|arm64) cfarch="arm64" ;; *) cfarch="" ;; esac
+  if [ -n "$cfarch" ]; then
+    mkdir -p /opt/cloudflared
+    if curl -fsSL --max-time 180 "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$cfarch" -o /opt/cloudflared/cloudflared.tmp        && [ "$(wc -c < /opt/cloudflared/cloudflared.tmp)" -gt 1000000 ]; then
+      chmod 755 /opt/cloudflared/cloudflared.tmp; mv /opt/cloudflared/cloudflared.tmp /opt/cloudflared/cloudflared
+      ok "cloudflared (for domain access)"
+    else
+      rm -f /opt/cloudflared/cloudflared.tmp; warn "Could not download cloudflared; domain access via Cloudflare will be unavailable."
+    fi
+  fi
+fi
+
 # ------------------------------------------------------------------ fetch the application
 step "Downloading Oculyx"
 work="$(mktemp -d)"

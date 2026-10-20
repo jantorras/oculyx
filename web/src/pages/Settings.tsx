@@ -9,7 +9,7 @@ export function Settings({ tab: tabParam }: { tab?: string }) {
   const t = useT();
   const user = useUser();
   const isAdmin = user.role === 'admin';
-  const tabs = isAdmin ? ['enroll', 'users', 'notify', 'audit', 'account'] : ['account'];
+  const tabs = isAdmin ? ['enroll', 'users', 'notify', 'domain', 'audit', 'account'] : ['account'];
   const tab = tabs.includes(tabParam ?? '') ? tabParam! : tabs[0];
   return (
     <>
@@ -20,6 +20,7 @@ export function Settings({ tab: tabParam }: { tab?: string }) {
       {tab === 'enroll' && <AddHost />}
       {tab === 'users' && <Users />}
       {tab === 'notify' && <Notify />}
+      {tab === 'domain' && <Domain />}
       {tab === 'audit' && <Audit />}
       {tab === 'account' && <Account />}
     </>
@@ -122,6 +123,78 @@ function Notify() {
         <button className="btn" onClick={() => api('/settings/test-notify', { method: 'POST', body: {} })}>{t('notify.test')}</button>
         <span className="muted">{msg}</span>
       </div>
+    </div>
+  );
+}
+
+function Domain() {
+  const t = useT();
+  const { data, refresh } = usePoll(() => api<any>('/tunnel'), 3000);
+  const [token, setToken] = useState('');
+  const [host, setHost] = useState<string | null>(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (!data) return null;
+  const hostname = host ?? data.hostname ?? '';
+  const run = async (method: string, body?: unknown) => {
+    setErr('');
+    setBusy(true);
+    try {
+      await api('/tunnel', { method, body: body ?? {} });
+      setToken('');
+      setHost(null);
+      refresh();
+    } catch (x) {
+      setErr(t(`err.${(x as Error).message}`));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const stateLabel = !data.hasToken ? t('domain.not_configured') : t(`domain.state_${data.state}`);
+  const tone = data.state === 'connected' ? 'var(--ok)' : data.state === 'error' ? 'var(--bad, #e5484d)' : 'var(--muted)';
+  return (
+    <div className="grid" style={{ maxWidth: 680 }}>
+      <Card title={t('domain.title')}>
+        <p className="muted" style={{ marginTop: 0 }}>{t('domain.intro')}</p>
+        {!data.available && <div className="error" role="alert">{t('domain.no_binary')}</div>}
+        <div className="row" style={{ gap: 8, margin: '10px 0' }}>
+          <span style={{ width: 9, height: 9, borderRadius: 99, background: tone, display: 'inline-block' }} />
+          <b>{stateLabel}</b>
+          {data.state === 'connected' && data.hostname && <a href={`https://${data.hostname}`} target="_blank" rel="noreferrer">https://{data.hostname}</a>}
+        </div>
+        <div className="grid">
+          <label className="field">{t('domain.token')}
+            <input type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" spellCheck={false}
+              placeholder={data.hasToken ? t('domain.token_saved') : 'eyJhIjoi…'} />
+          </label>
+          <label className="field">{t('domain.hostname')}
+            <input value={hostname} onChange={(e) => setHost(e.target.value)} placeholder="oculyx.example.com" autoComplete="off" spellCheck={false} />
+          </label>
+        </div>
+        {err && <div className="error" role="alert" style={{ marginTop: 8 }}>{err}</div>}
+        <div className="row" style={{ marginTop: 12, gap: 8 }}>
+          <button className="btn primary" disabled={busy || !data.available || (!token && !data.hasToken)}
+            onClick={() => run('PUT', { ...(token ? { token } : {}), hostname, enabled: true })}>
+            {data.enabled ? t('domain.save_restart') : t('domain.save_enable')}
+          </button>
+          {data.enabled && <button className="btn" disabled={busy} onClick={() => run('PUT', { enabled: false })}>{t('domain.disable')}</button>}
+          {data.hasToken && <button className="btn danger" disabled={busy} onClick={() => { if (confirm(t('domain.confirm_remove'))) run('DELETE'); }}>{t('domain.remove')}</button>}
+        </div>
+      </Card>
+      <Card title={t('domain.howto')}>
+        <ol className="muted" style={{ margin: 0, paddingLeft: 20, lineHeight: 1.7, fontSize: 13.5 }}>
+          <li>{t('domain.step1')}</li>
+          <li>{t('domain.step2')}</li>
+          <li>{t('domain.step3')}</li>
+          <li>{t('domain.step4')}</li>
+        </ol>
+        <p className="muted" style={{ fontSize: 12.5, marginBottom: 0 }}>{t('domain.note')}</p>
+      </Card>
+      {data.log.length > 0 && (
+        <Card title={t('domain.log')}>
+          <pre className="mono muted" style={{ margin: 0, fontSize: 11.5, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 220, overflow: 'auto' }}>{data.log.join('\n')}</pre>
+        </Card>
+      )}
     </div>
   );
 }
