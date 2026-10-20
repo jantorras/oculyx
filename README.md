@@ -5,6 +5,22 @@
   One lightweight server, many agents that connect <b>outbound</b>. Runs happily in a Proxmox LXC.
 </p>
 
+<p align="center">
+  <a href="https://github.com/jantorras/oculyx/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/jantorras/oculyx/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/jantorras/oculyx/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/jantorras/oculyx?color=2dd4a0"></a>
+  <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
+  <img alt="Languages" src="https://img.shields.io/badge/UI-ca%20%C2%B7%20es%20%C2%B7%20en-lightgrey">
+</p>
+
+<p align="center">
+  <a href="#install-the-server"><b>Install</b></a> &nbsp;·&nbsp;
+  <a href="#proxmox-lxc-recommended">Proxmox LXC</a> &nbsp;·&nbsp;
+  <a href="#docker-compose">Docker</a> &nbsp;·&nbsp;
+  <a href="#use-your-own-domain-cloudflare-tunnel">Domain</a> &nbsp;·&nbsp;
+  <a href="#add-servers-to-monitor">Add servers</a> &nbsp;·&nbsp;
+  <a href="#try-it-without-installing-anything">Demo</a>
+</p>
+
 <p align="center"><img src="docs/screenshots/overview.png" alt="Oculyx overview dashboard" width="900"></p>
 
 ## What you get
@@ -25,41 +41,84 @@
 
 ## Install the server
 
-Pick one. All three give you the same app; your data lives in one place (`/var/lib/oculyx`, or a Docker volume).
+Three ways, same app. Your data always lives in one place (`/var/lib/oculyx` or a Docker volume), so you can switch later.
 
-### A) Proxmox LXC (recommended for homelabs)
+| | **Proxmox LXC** | **Docker Compose** | **Debian / Ubuntu** |
+|---|---|---|---|
+| Best for | homelabs on Proxmox | any machine with Docker | a plain VM or bare metal |
+| Effort | one command, guided menu | clone + `up -d` | one command |
+| HTTPS | Cloudflare Tunnel from the UI, or any proxy | bundled Caddy, or Cloudflare Tunnel | Cloudflare Tunnel from the UI, or any proxy |
+| Update | pick *Update* in the script | `git pull && docker compose up -d --build` | `oculyx-update` |
 
-Run this in the **Proxmox host shell**. It creates an unprivileged Debian 12 container, installs Oculyx as a systemd service and prints the URL and first admin password.
+### Proxmox LXC (recommended)
+
+Open the **Proxmox host shell** (Datacenter → your node → *Shell*) and paste:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/jantorras/oculyx/main/deploy/proxmox/oculyx-lxc.sh)"
 ```
 
-Defaults: 2 cores, 1 GB RAM, 8 GB disk, DHCP on `vmbr0`. Everything is overridable, e.g. a static address:
+An interactive menu opens, like the community helper scripts:
+
+```
+┌──────────── Oculyx LXC installer ────────────┐
+│  1  Install with default settings (recommended)
+│  2  Install with advanced settings
+│  3  Update an existing Oculyx container
+│  4  Cancel
+└───────────────────────────────────────────────┘
+```
+
+- **Default settings**: unprivileged Debian 12 container, 2 cores, 1 GB RAM, 8 GB disk, DHCP on `vmbr0`, auto-start on boot. You only confirm.
+- **Advanced settings**: step by step, container ID, hostname, CPU, RAM, disk, storage, bridge, DHCP or static IP, VLAN and web port.
+- **Update**: lists the Oculyx containers on the node and upgrades the one you pick. The database is backed up first.
+
+When it finishes it prints the URL and the first admin password (shown once). Open the URL, sign in, change the password under *Settings → My account*.
+
+Unattended / scripted use skips the menu:
 
 ```bash
 bash oculyx-lxc.sh --ip 192.168.1.50/24 --gw 192.168.1.1 --ctid 120 --storage local-zfs --yes
+bash oculyx-lxc.sh --update 120
 ```
 
-Update later with `bash oculyx-lxc.sh --update <CTID>` (or `oculyx-update` inside the container). Back up with `vzdump`.
+Run `bash oculyx-lxc.sh --help` for every option. Back the container up with `vzdump <CTID>`.
 
-### B) Any Debian / Ubuntu machine or VM (no Docker)
+### Docker Compose
+
+Needs Docker with the Compose plugin. Nothing else.
+
+```bash
+git clone https://github.com/jantorras/oculyx && cd oculyx
+docker compose up -d --build
+docker compose logs oculyx | grep password      # first admin password, printed once
+```
+
+Then open `http://<this-machine>` (port 80, through the bundled Caddy reverse proxy).
+
+- **Your own domain with automatic HTTPS**: point its DNS at the machine and start with `OCULYX_DOMAIN=oculyx.example.com docker compose up -d`.
+- **No open ports at all**: keep the default and use *Settings → Domain* to connect a Cloudflare Tunnel (see below). The image ships with `cloudflared`.
+- **Your own admin password**: uncomment `OCULYX_ADMIN_PASSWORD` in `docker-compose.yml` before the first start.
+- **Update**: `git pull && docker compose up -d --build`. Data is kept in the `oculyx-data` volume.
+- **Back up**: `docker run --rm -v oculyx_oculyx-data:/d -v "$PWD":/b alpine tar czf /b/oculyx-backup.tgz -C /d .`
+
+### Any Debian / Ubuntu machine or VM (no Docker)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jantorras/oculyx/main/deploy/install-server.sh | sudo bash
 ```
 
-Installs Node.js 24 (official build, checksum verified), a dedicated `oculyx` user and a hardened systemd service. Re-run it, or run `oculyx-update`, to upgrade; the database is backed up first (`/var/lib/oculyx/backups`). Settings live in `/etc/oculyx/oculyx.env`. `--uninstall [--purge]` removes it.
+Installs Node.js 24 (official build, checksum verified), a dedicated `oculyx` user and a hardened systemd service. Run `oculyx-update` to upgrade (the database is backed up to `/var/lib/oculyx/backups` first). Settings live in `/etc/oculyx/oculyx.env`. `--uninstall [--purge]` removes it. This is also what the LXC script runs inside the container.
 
-### C) Docker Compose
+## Use your own domain (Cloudflare Tunnel)
 
-```bash
-git clone https://github.com/jantorras/oculyx && cd oculyx
-docker compose up -d --build
-docker compose logs oculyx | grep password     # first admin password, printed once
-```
+No port forwarding, no reverse proxy, HTTPS included, configured from the web UI:
 
-Set `OCULYX_DOMAIN` for automatic HTTPS through the bundled Caddy.
+1. In Cloudflare open **Zero Trust → Networks → Tunnels**, create a tunnel (type *Cloudflared*) and copy its token.
+2. In that tunnel add a **Public hostname** (your domain) pointing to `HTTP` → `localhost:8080`. `cloudflared` runs inside the Oculyx server itself, so `localhost:8080` is right for every install method.
+3. In Oculyx open **Settings → Domain**, paste the token and the domain, press **Save and enable**.
+
+The server runs `cloudflared` itself and shows the tunnel status. Generated agent install commands switch to the new domain automatically.
 
 ## Add servers to monitor
 
@@ -100,9 +159,9 @@ The installer checks requirements, downloads the agent from **your** server, sta
 
 Set the address agents should use under *Settings → Add hosts → Edit* when it differs from the one in your browser (reverse proxy, different DNS name).
 
-## HTTPS
+## HTTPS with your own proxy
 
-Oculyx speaks plain HTTP; put TLS in front of it and set `OCULYX_TRUST_PROXY=1` in `/etc/oculyx/oculyx.env`. A minimal Caddy example:
+Prefer your own reverse proxy over the Cloudflare Tunnel? Oculyx speaks plain HTTP; put TLS in front of it and set `OCULYX_TRUST_PROXY=1` in `/etc/oculyx/oculyx.env`. A minimal Caddy example:
 
 ```
 oculyx.example.com {
