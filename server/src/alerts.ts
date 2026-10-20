@@ -2,6 +2,7 @@ import type { Db } from './db.ts';
 import { createHash } from 'node:crypto';
 import { notify } from './notify.ts';
 import { sevRank } from './rules.ts';
+import { alertInfo } from './alertinfo.ts';
 
 export const OFFLINE_AFTER_MS = 45_000;
 
@@ -44,9 +45,10 @@ export class Alerts {
     const host = this.agentName(agentId);
     void (async () => {
       const why = this.explain ? await this.explain({ agentId, host, rule, severity, message }) : '';
-      await notify(this.db, { severity, title: `${host}: ${rule.split(':')[0].replaceAll('_', ' ')}`, body: why ? `${message}
-
-${why}` : message });
+      const lang = this.db.setting('notify.language') || this.db.setting('ai.language') || 'en';
+      const info = alertInfo(rule, lang);
+      const body = [message, info && `${info.meaning}\n\u2192 ${info.todo}`, why].filter(Boolean).join('\n\n');
+      await notify(this.db, { severity, title: `${host}: ${rule.split(':')[0].replaceAll('_', ' ')}`, body });
     })();
   }
 

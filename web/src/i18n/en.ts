@@ -536,4 +536,7 @@ export const en: Record<string, string> = {
   'aiset.digest_sent': 'Digest sent.',
   'aiset.language': 'Language of the answers',
   'aiset.privacy': 'To answer, the assistant sends your provider the data it needs: host names, addresses, alerts and events. Hosts can contain text written by attackers; the assistant is told to treat it as data. For total privacy use Ollama on your own network.',
+  'alerts.what_to_do': 'What to do:',
+  'notify.language': 'Notification language',
+  'notify.language_help': 'Language of the explanation added to every notification',
 };

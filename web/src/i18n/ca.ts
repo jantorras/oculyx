@@ -536,4 +536,7 @@ export const ca: Record<string, string> = {
   'aiset.digest_sent': 'Resum enviat.',
   'aiset.language': 'Idioma de les respostes',
   'aiset.privacy': 'Per respondre, l’assistent envia al teu proveïdor les dades que necessita: noms d’host, adreces, alertes i esdeveniments. Els hosts poden contenir text escrit per atacants; a l’assistent se li indica que ho tracti com a dades. Per a privacitat total fes servir Ollama a la teva xarxa.',
+  'alerts.what_to_do': 'Què fer:',
+  'notify.language': 'Idioma de les notificacions',
+  'notify.language_help': 'Idioma de l’explicació que s’afegeix a cada notificació',
 };

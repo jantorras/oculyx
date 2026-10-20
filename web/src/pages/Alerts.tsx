@@ -1,3 +1,4 @@
+import { AlertInfo } from '../components/AlertInfo';
 import { useMemo, useState } from 'react';
 import { api, usePoll, useRoute, hashQuery, setHashQuery, ago, clock, duration, SEV_COLOR } from '../lib';
 import { useT } from '../i18n';
@@ -167,6 +168,7 @@ export function Alerts() {
                     <h3>{t(`rule.${a.rule.split(':')[0]}`)}</h3>
                   </div>
                   <p className="ar-msg">{a.message}</p>
+                  <AlertInfo rule={a.rule} />
                   <a className="chip ar-host" href={`#/hosts/${a.agent_id}`}>
                     {Icon.hosts}
                     {a.agent}

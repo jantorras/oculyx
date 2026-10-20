@@ -10,6 +10,7 @@ import { Hub } from './hub.ts';
 import { notify } from './notify.ts';
 import { Ai, AiError, providerDefaults } from './ai.ts';
 import { TelegramBot } from './telegram.ts';
+import { alertCatalog } from './alertinfo.ts';
 import { Tunnel, validTunnelToken, validHostname } from './tunnel.ts';
 import { RULES, ruleConfig } from './rules.ts';
 import { KeyVault, generateKey, importKey, connect, exec, shell, loadAccess, SshError } from './ssh.ts';
@@ -456,6 +457,9 @@ app.post('/api/agents/update', admin, async (req, reply) => {
   return { results };
 });
 
+/** Plain-language meaning and first steps for every alert type, all languages (the UI picks its own). */
+app.get('/api/alert-info', viewer, async () => alertCatalog());
+
 app.get('/api/alerts', viewer, async (req) => {
   const { state } = req.query as { state?: string };
   return db.all(
@@ -600,7 +604,7 @@ app.delete('/api/users/:id', admin, async (req, reply) => {
   return { ok: true };
 });
 
-const SETTING_KEYS = ['server.public_url', 'notify.webhook', 'notify.telegram_token', 'notify.telegram_chat', 'threshold.cpu', 'threshold.mem', 'threshold.disk'];
+const SETTING_KEYS = ['server.public_url', 'notify.webhook', 'notify.telegram_token', 'notify.telegram_chat', 'threshold.cpu', 'threshold.mem', 'threshold.disk', 'notify.language'];
 app.get('/api/settings', admin, async () => ({
   ...Object.fromEntries(SETTING_KEYS.map((k) => [k, db.setting(k)])),
   defaults: DEFAULT_THRESHOLDS,

@@ -1,0 +1,394 @@
+{
+ "cpu_high": {
+  "en": {
+   "meaning": "The processor has been busy above the limit for several readings in a row, so this is not a short spike.",
+   "todo": "Find the heavy process (top, or the Containers tab). If it is expected load, consider raising the limit or adding capacity."
+  },
+  "es": {
+   "meaning": "El procesador lleva varias lecturas seguidas por encima del límite, así que no es un pico puntual.",
+   "todo": "Busca el proceso que consume (top, o la pestaña Contenedores). Si es carga esperada, sube el límite o amplía recursos."
+  },
+  "ca": {
+   "meaning": "El processador porta diverses lectures seguides per sobre del límit, així que no és un pic puntual.",
+   "todo": "Busca el procés que consumeix (top, o la pestanya Contenidors). Si és càrrega esperada, puja el límit o amplia recursos."
+  }
+ },
+ "mem_high": {
+  "en": {
+   "meaning": "Memory use stayed above the limit. When it runs out the system starts killing processes.",
+   "todo": "Check which process or container uses most memory and restart a leaking one. Add RAM or swap if it keeps happening."
+  },
+  "es": {
+   "meaning": "El uso de memoria se mantiene por encima del límite. Si se agota, el sistema empieza a matar procesos.",
+   "todo": "Mira qué proceso o contenedor usa más memoria y reinicia el que tenga fugas. Añade RAM o swap si se repite."
+  },
+  "ca": {
+   "meaning": "L’ús de memòria es manté per sobre del límit. Si s’esgota, el sistema comença a matar processos.",
+   "todo": "Mira quin procés o contenidor usa més memòria i reinicia el que tingui fuites. Afegeix RAM o swap si es repeteix."
+  }
+ },
+ "disk_high": {
+  "en": {
+   "meaning": "The disk is almost full. A full disk stops databases, logs and updates from working.",
+   "todo": "Free space now: old logs, Docker images (docker system prune), backups. Then plan more disk."
+  },
+  "es": {
+   "meaning": "El disco está casi lleno. Un disco lleno bloquea bases de datos, logs y actualizaciones.",
+   "todo": "Libera espacio ya: logs antiguos, imágenes Docker (docker system prune), copias. Después planifica más disco."
+  },
+  "ca": {
+   "meaning": "El disc és gairebé ple. Un disc ple bloqueja bases de dades, logs i actualitzacions.",
+   "todo": "Allibera espai ara: logs antics, imatges Docker (docker system prune), còpies. Després planifica més disc."
+  }
+ },
+ "offline": {
+  "en": {
+   "meaning": "The server stopped sending data to Oculyx. It may be off, unreachable or the agent stopped.",
+   "todo": "Check that the machine is on and reachable. If it is, restart the agent (systemctl restart oculyx-agent or docker restart oculyx-agent)."
+  },
+  "es": {
+   "meaning": "El servidor dejó de enviar datos a Oculyx. Puede estar apagado, inaccesible o el agente parado.",
+   "todo": "Comprueba que la máquina está encendida y accesible. Si lo está, reinicia el agente (systemctl restart oculyx-agent o docker restart oculyx-agent)."
+  },
+  "ca": {
+   "meaning": "El servidor ha deixat d’enviar dades a Oculyx. Pot estar apagat, inaccessible o l’agent aturat.",
+   "todo": "Comprova que la màquina està encesa i accessible. Si ho està, reinicia l’agent (systemctl restart oculyx-agent o docker restart oculyx-agent)."
+  }
+ },
+ "container_crashed": {
+  "en": {
+   "meaning": "A container exited with an error instead of stopping normally.",
+   "todo": "Read its logs (Containers tab) to see why. Fix the cause, then start it again."
+  },
+  "es": {
+   "meaning": "Un contenedor terminó con error en lugar de parar con normalidad.",
+   "todo": "Lee sus logs (pestaña Contenedores) para ver el motivo. Corrige la causa y vuelve a iniciarlo."
+  },
+  "ca": {
+   "meaning": "Un contenidor ha acabat amb error en lloc d’aturar-se amb normalitat.",
+   "todo": "Llegeix-ne els logs (pestanya Contenidors) per veure’n el motiu. Corregeix la causa i torna a iniciar-lo."
+  }
+ },
+ "finding": {
+  "en": {
+   "meaning": "A serious security weakness was found on this server (see the Security tab for the detail).",
+   "todo": "Open the finding: many have a fix button that shows what it will change before applying it."
+  },
+  "es": {
+   "meaning": "Se ha encontrado una debilidad de seguridad seria en este servidor (detalle en la pestaña Seguridad).",
+   "todo": "Abre el hallazgo: muchos tienen un botón de solución que muestra qué cambiará antes de aplicarlo."
+  },
+  "ca": {
+   "meaning": "S’ha trobat una debilitat de seguretat seriosa en aquest servidor (detall a la pestanya Seguretat).",
+   "todo": "Obre la troballa: molts tenen un botó de solució que mostra què canviarà abans d’aplicar-lo."
+  }
+ },
+ "ssh_login_after_failures": {
+  "en": {
+   "meaning": "Someone logged in right after many failed attempts from the same address. That is the typical sign of a guessed password.",
+   "todo": "Treat the account as compromised: end its sessions, lock it or change its password, and check what it did. Block the address."
+  },
+  "es": {
+   "meaning": "Alguien entró justo después de muchos intentos fallidos desde la misma dirección. Es la señal típica de una contraseña adivinada.",
+   "todo": "Trata la cuenta como comprometida: cierra sus sesiones, bloquéala o cambia la contraseña y revisa qué hizo. Bloquea la dirección."
+  },
+  "ca": {
+   "meaning": "Algú ha entrat just després de molts intents fallits des de la mateixa adreça. És el senyal típic d’una contrasenya endevinada.",
+   "todo": "Tracta el compte com a compromès: tanca’n les sessions, bloqueja’l o canvia la contrasenya i revisa què ha fet. Bloqueja l’adreça."
+  }
+ },
+ "ssh_root_login": {
+  "en": {
+   "meaning": "Someone signed in as root over SSH. Root can do anything, so direct logins are rarely needed.",
+   "todo": "If it was you, fine. If not, investigate now. Better: forbid root passwords and use a normal account with sudo."
+  },
+  "es": {
+   "meaning": "Alguien entró como root por SSH. Root puede hacerlo todo, así que rara vez hacen falta accesos directos.",
+   "todo": "Si fuiste tú, correcto. Si no, investiga ya. Mejor: prohíbe contraseñas de root y usa una cuenta normal con sudo."
+  },
+  "ca": {
+   "meaning": "Algú ha entrat com a root per SSH. Root ho pot fer tot, així que rarament calen accessos directes.",
+   "todo": "Si has estat tu, correcte. Si no, investiga ara. Millor: prohibeix contrasenyes de root i fes servir un compte normal amb sudo."
+  }
+ },
+ "ssh_new_source": {
+  "en": {
+   "meaning": "An account logged in from an address it had never used before.",
+   "todo": "Confirm it is you or a known colleague (new network, VPN, travel). If not, end the session and lock the account."
+  },
+  "es": {
+   "meaning": "Una cuenta entró desde una dirección que nunca había usado.",
+   "todo": "Confirma que eres tú o un compañero conocido (red nueva, VPN, viaje). Si no, cierra la sesión y bloquea la cuenta."
+  },
+  "ca": {
+   "meaning": "Un compte ha entrat des d’una adreça que mai havia fet servir.",
+   "todo": "Confirma que ets tu o un company conegut (xarxa nova, VPN, viatge). Si no, tanca la sessió i bloqueja el compte."
+  }
+ },
+ "ssh_off_hours": {
+  "en": {
+   "meaning": "A login happened outside your normal working hours.",
+   "todo": "Check that it was expected (on-call, automated job). Otherwise review the account activity."
+  },
+  "es": {
+   "meaning": "Hubo un acceso fuera de tu horario de trabajo habitual.",
+   "todo": "Comprueba que era esperado (guardia, tarea automática). Si no, revisa la actividad de la cuenta."
+  },
+  "ca": {
+   "meaning": "Hi ha hagut un accés fora del teu horari de treball habitual.",
+   "todo": "Comprova que era esperat (guàrdia, tasca automàtica). Si no, revisa l’activitat del compte."
+  }
+ },
+ "ssh_password_login": {
+  "en": {
+   "meaning": "Someone logged in with a password instead of an SSH key. Passwords can be guessed or leaked.",
+   "todo": "Move that account to key login, then turn off password logins from the SSH tab."
+  },
+  "es": {
+   "meaning": "Alguien entró con contraseña en lugar de con clave SSH. Las contraseñas pueden adivinarse o filtrarse.",
+   "todo": "Pasa esa cuenta a clave y desactiva el acceso con contraseña desde la pestaña SSH."
+  },
+  "ca": {
+   "meaning": "Algú ha entrat amb contrasenya en lloc de clau SSH. Les contrasenyes es poden endevinar o filtrar.",
+   "todo": "Passa aquest compte a clau i desactiva l’accés amb contrasenya des de la pestanya SSH."
+  }
+ },
+ "ssh_bruteforce": {
+  "en": {
+   "meaning": "Many failed SSH logins came from one address in a short time: a bot guessing passwords.",
+   "todo": "Block the address from the Manage tab. Install fail2ban and turn off password logins so this stops mattering."
+  },
+  "es": {
+   "meaning": "Muchos accesos SSH fallidos desde una misma dirección en poco tiempo: un bot probando contraseñas.",
+   "todo": "Bloquea la dirección desde la pestaña Gestiona. Instala fail2ban y desactiva el acceso con contraseña para que deje de importar."
+  },
+  "ca": {
+   "meaning": "Molts accessos SSH fallits des d’una mateixa adreça en poc temps: un bot provant contrasenyes.",
+   "todo": "Bloqueja l’adreça des de la pestanya Gestiona. Instal·la fail2ban i desactiva l’accés amb contrasenya perquè deixi d’importar."
+  }
+ },
+ "su_to_root": {
+  "en": {
+   "meaning": "Someone switched to root with su.",
+   "todo": "Check it was an administrator doing legitimate work. Prefer sudo, which leaves a clearer trail."
+  },
+  "es": {
+   "meaning": "Alguien cambió a root con su.",
+   "todo": "Comprueba que fue un administrador haciendo trabajo legítimo. Mejor sudo, que deja más rastro."
+  },
+  "ca": {
+   "meaning": "Algú ha canviat a root amb su.",
+   "todo": "Comprova que va ser un administrador fent feina legítima. Millor sudo, que deixa més rastre."
+  }
+ },
+ "sudo_suspicious": {
+  "en": {
+   "meaning": "A sudo command that attackers commonly use: opening a root shell, changing permissions to run as root, editing accounts, deleting logs or touching the firewall.",
+   "todo": "Read the command in the alert. If you do not recognise it, lock the account, end its sessions and review what changed."
+  },
+  "es": {
+   "meaning": "Un comando sudo típico de atacantes: abrir una shell de root, cambiar permisos para ejecutar como root, editar cuentas, borrar logs o tocar el firewall.",
+   "todo": "Lee el comando de la alerta. Si no lo reconoces, bloquea la cuenta, cierra sus sesiones y revisa qué cambió."
+  },
+  "ca": {
+   "meaning": "Una ordre sudo típica d’atacants: obrir una shell de root, canviar permisos per executar com a root, editar comptes, esborrar logs o tocar el firewall.",
+   "todo": "Llegeix l’ordre de l’alerta. Si no la reconeixes, bloqueja el compte, tanca’n les sessions i revisa què ha canviat."
+  }
+ },
+ "user_created": {
+  "en": {
+   "meaning": "A new local account appeared. Attackers create accounts to keep access.",
+   "todo": "Check that you or a colleague created it. If not, lock or delete it and find how it got there."
+  },
+  "es": {
+   "meaning": "Apareció una cuenta local nueva. Los atacantes crean cuentas para mantener el acceso.",
+   "todo": "Comprueba que la creaste tú o un compañero. Si no, bloquéala o elimínala y averigua cómo llegó."
+  },
+  "ca": {
+   "meaning": "Ha aparegut un compte local nou. Els atacants creen comptes per mantenir l’accés.",
+   "todo": "Comprova que l’has creat tu o un company. Si no, bloqueja-la o elimina-la i esbrina com ha arribat."
+  }
+ },
+ "user_removed": {
+  "en": {
+   "meaning": "A local account disappeared. Sometimes intruders delete accounts to cover their tracks.",
+   "todo": "Confirm it was a planned removal. If not, review recent logins and changes."
+  },
+  "es": {
+   "meaning": "Desapareció una cuenta local. A veces los intrusos borran cuentas para tapar sus huellas.",
+   "todo": "Confirma que fue una baja prevista. Si no, revisa los accesos y cambios recientes."
+  },
+  "ca": {
+   "meaning": "Ha desaparegut un compte local. De vegades els intrusos esborren comptes per tapar les seves petjades.",
+   "todo": "Confirma que va ser una baixa prevista. Si no, revisa els accessos i canvis recents."
+  }
+ },
+ "privileged_group_added": {
+  "en": {
+   "meaning": "An account joined a group that grants admin power (sudo, wheel, admin, docker, lxd). That is equivalent to root.",
+   "todo": "Check it was intended. If not, remove it from the group from the Manage tab and investigate."
+  },
+  "es": {
+   "meaning": "Una cuenta entró en un grupo con poder de administrador (sudo, wheel, admin, docker, lxd). Equivale a root.",
+   "todo": "Comprueba que era intencionado. Si no, quítala del grupo desde la pestaña Gestiona e investiga."
+  },
+  "ca": {
+   "meaning": "Un compte ha entrat a un grup amb poder d’administrador (sudo, wheel, admin, docker, lxd). Equival a root.",
+   "todo": "Comprova que era intencionat. Si no, treu-la del grup des de la pestanya Gestiona i investiga."
+  }
+ },
+ "ssh_key_added": {
+  "en": {
+   "meaning": "A new SSH key was added to an account. A hidden key is a favourite backdoor: it keeps working even if the password changes.",
+   "todo": "If you did not add it, remove the key (SSH tab) and review how it got there. Keys deployed from this panel are not reported."
+  },
+  "es": {
+   "meaning": "Se añadió una clave SSH nueva a una cuenta. Una clave oculta es una puerta trasera favorita: sigue valiendo aunque cambies la contraseña.",
+   "todo": "Si no la añadiste tú, elimínala (pestaña SSH) y revisa cómo llegó. Las claves desplegadas desde este panel no se avisan."
+  },
+  "ca": {
+   "meaning": "S’ha afegit una clau SSH nova a un compte. Una clau amagada és una porta del darrere preferida: continua valent encara que canviïs la contrasenya.",
+   "todo": "Si no l’has afegit tu, elimina-la (pestanya SSH) i revisa com ha arribat. Les claus desplegades des d’aquest panell no s’avisen."
+  }
+ },
+ "persistence_changed": {
+  "en": {
+   "meaning": "A file that runs automatically changed (cron, systemd service, shell profile, PAM, ld.so.preload). Attackers use these to survive reboots.",
+   "todo": "Read the file named in the alert. If it was not an update or your change, treat the server as compromised."
+  },
+  "es": {
+   "meaning": "Cambió un archivo que se ejecuta automáticamente (cron, servicio systemd, perfil de shell, PAM, ld.so.preload). Los atacantes los usan para sobrevivir a reinicios.",
+   "todo": "Lee el archivo que indica la alerta. Si no fue una actualización o un cambio tuyo, trata el servidor como comprometido."
+  },
+  "ca": {
+   "meaning": "Ha canviat un fitxer que s’executa automàticament (cron, servei systemd, perfil de shell, PAM, ld.so.preload). Els atacants els fan servir per sobreviure a reinicis.",
+   "todo": "Llegeix el fitxer que indica l’alerta. Si no va ser una actualització o un canvi teu, tracta el servidor com a compromès."
+  }
+ },
+ "suid_added": {
+  "en": {
+   "meaning": "A new program with the SUID bit appeared: it runs with its owner's privileges (often root) and is a classic privilege escalation trick.",
+   "todo": "Identify the file. If it is not from a package you installed, remove the bit (chmod u-s) or delete it."
+  },
+  "es": {
+   "meaning": "Apareció un programa nuevo con el bit SUID: se ejecuta con los privilegios de su dueño (a menudo root) y es un truco clásico de escalada.",
+   "todo": "Identifica el archivo. Si no es de un paquete que instalaste, quita el bit (chmod u-s) o bórralo."
+  },
+  "ca": {
+   "meaning": "Ha aparegut un programa nou amb el bit SUID: s’executa amb els privilegis del seu propietari (sovint root) i és un truc clàssic d’escalada.",
+   "todo": "Identifica el fitxer. Si no és d’un paquet que has instal·lat, treu-li el bit (chmod u-s) o esborra’l."
+  }
+ },
+ "fim_changed": {
+  "en": {
+   "meaning": "A monitored system file changed (for example sshd_config, passwd or sudoers).",
+   "todo": "If you or an update changed it, accept the new baseline. If not, compare with a backup and investigate."
+  },
+  "es": {
+   "meaning": "Cambió un archivo de sistema vigilado (por ejemplo sshd_config, passwd o sudoers).",
+   "todo": "Si lo cambiaste tú o una actualización, acepta la nueva referencia. Si no, compáralo con una copia e investiga."
+  },
+  "ca": {
+   "meaning": "Ha canviat un fitxer de sistema vigilat (per exemple sshd_config, passwd o sudoers).",
+   "todo": "Si l’has canviat tu o una actualització, accepta la nova referència. Si no, compara’l amb una còpia i investiga."
+  }
+ },
+ "reverse_shell": {
+  "en": {
+   "meaning": "A shell has its input and output tied to a network connection: someone is controlling this server remotely. This is very serious.",
+   "todo": "Act now: isolate the server from the network, note the remote address, kill the process and plan to rebuild from a clean backup."
+  },
+  "es": {
+   "meaning": "Una shell tiene su entrada y salida atadas a una conexión de red: alguien controla este servidor de forma remota. Es muy grave.",
+   "todo": "Actúa ya: aísla el servidor de la red, anota la dirección remota, mata el proceso y planea reconstruirlo desde una copia limpia."
+  },
+  "ca": {
+   "meaning": "Una shell té l’entrada i la sortida lligades a una connexió de xarxa: algú controla aquest servidor en remot. És molt greu.",
+   "todo": "Actua ara: aïlla el servidor de la xarxa, anota l’adreça remota, mata el procés i planeja reconstruir-lo des d’una còpia neta."
+  }
+ },
+ "cryptominer": {
+  "en": {
+   "meaning": "A process looks like a cryptocurrency miner. It eats CPU and usually means the server was broken into.",
+   "todo": "Kill it and find out how it got in (weak password, exposed service, vulnerable app). Rotate credentials."
+  },
+  "es": {
+   "meaning": "Un proceso parece un minero de criptomonedas. Consume CPU y suele indicar que entraron al servidor.",
+   "todo": "Mátalo y averigua cómo entró (contraseña débil, servicio expuesto, app vulnerable). Cambia credenciales."
+  },
+  "ca": {
+   "meaning": "Un procés sembla un miner de criptomonedes. Consumeix CPU i sol indicar que han entrat al servidor.",
+   "todo": "Mata’l i esbrina com ha entrat (contrasenya feble, servei exposat, app vulnerable). Canvia credencials."
+  }
+ },
+ "suspicious_process": {
+  "en": {
+   "meaning": "A program is running from a temporary place (/tmp, /dev/shm...) or has been deleted from disk. Legitimate software rarely does that; malware often does.",
+   "todo": "Look at what the process is (path, user). If unknown, kill it and review how it was started."
+  },
+  "es": {
+   "meaning": "Un programa se ejecuta desde un lugar temporal (/tmp, /dev/shm...) o fue borrado del disco. El software legítimo rara vez lo hace; el malware a menudo sí.",
+   "todo": "Mira qué es el proceso (ruta, usuario). Si no lo conoces, mátalo y revisa cómo se inició."
+  },
+  "ca": {
+   "meaning": "Un programa s’executa des d’un lloc temporal (/tmp, /dev/shm...) o ha estat esborrat del disc. El programari legítim rarament ho fa; el malware sovint sí.",
+   "todo": "Mira què és el procés (ruta, usuari). Si no el coneixes, mata’l i revisa com s’ha iniciat."
+  }
+ },
+ "unknown_kernel_module": {
+  "en": {
+   "meaning": "A kernel module that is not part of the normal set is loaded. Rootkits hide inside kernel modules.",
+   "todo": "Identify the module (lsmod, modinfo). If you do not recognise it, investigate as a possible rootkit."
+  },
+  "es": {
+   "meaning": "Hay cargado un módulo del kernel que no es del conjunto normal. Los rootkits se esconden en módulos del kernel.",
+   "todo": "Identifica el módulo (lsmod, modinfo). Si no lo reconoces, investiga como posible rootkit."
+  },
+  "ca": {
+   "meaning": "Hi ha carregat un mòdul del nucli que no és del conjunt normal. Els rootkits s’amaguen en mòduls del nucli.",
+   "todo": "Identifica el mòdul (lsmod, modinfo). Si no el reconeixes, investiga com a possible rootkit."
+  }
+ },
+ "port_opened": {
+  "en": {
+   "meaning": "A new port started listening on the server, so a new service is reachable from the network.",
+   "todo": "Check it is intended. If not, close the port in the firewall or stop the service."
+  },
+  "es": {
+   "meaning": "Un puerto nuevo empezó a escuchar en el servidor, así que hay un servicio nuevo accesible desde la red.",
+   "todo": "Comprueba que es intencionado. Si no, cierra el puerto en el firewall o para el servicio."
+  },
+  "ca": {
+   "meaning": "Un port nou ha començat a escoltar al servidor, així que hi ha un servei nou accessible des de la xarxa.",
+   "todo": "Comprova que és intencionat. Si no, tanca el port al firewall o atura el servei."
+  }
+ },
+ "rdp_failed": {
+  "en": {
+   "meaning": "Many failed Windows logons in a short time: someone guessing passwords (often over Remote Desktop).",
+   "todo": "Do not expose RDP to the internet. Restrict it by address or use a VPN, and enable account lockout."
+  },
+  "es": {
+   "meaning": "Muchos inicios de sesión de Windows fallidos en poco tiempo: alguien probando contraseñas (a menudo por Escritorio remoto).",
+   "todo": "No expongas RDP a internet. Restríngelo por dirección o usa una VPN, y activa el bloqueo de cuenta."
+  },
+  "ca": {
+   "meaning": "Molts inicis de sessió de Windows fallits en poc temps: algú provant contrasenyes (sovint per Escriptori remot).",
+   "todo": "No exposis RDP a internet. Restringeix-lo per adreça o fes servir una VPN, i activa el bloqueig de compte."
+  }
+ },
+ "win_admin_change": {
+  "en": {
+   "meaning": "The membership of the Administrators group changed on a Windows host.",
+   "todo": "Check that it was a planned change. If not, remove the account and review recent logons."
+  },
+  "es": {
+   "meaning": "Cambió la pertenencia al grupo Administradores en un host Windows.",
+   "todo": "Comprueba que fue un cambio previsto. Si no, quita la cuenta y revisa los inicios de sesión recientes."
+  },
+  "ca": {
+   "meaning": "Ha canviat la pertinença al grup Administradors en un host Windows.",
+   "todo": "Comprova que va ser un canvi previst. Si no, treu el compte i revisa els inicis de sessió recents."
+  }
+ }
+}

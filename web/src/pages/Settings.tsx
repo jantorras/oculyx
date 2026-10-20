@@ -113,6 +113,13 @@ function Notify() {
           ))}
         </div>
       </Card>
+      <Card title={t('notify.language')}>
+        <label className="field" style={{ maxWidth: 260 }}>{t('notify.language_help')}
+          <select value={v['notify.language'] ?? ''} onChange={(e) => set('notify.language', e.target.value)}>
+            <option value="">English</option><option value="ca">Català</option><option value="es">Español</option>
+          </select>
+        </label>
+      </Card>
       <Card title={t('notify.channels')}>
         <div className="grid">
           <label className="field">Webhook URL (Slack, Discord, Teams…)<input value={v['notify.webhook'] ?? ''} onChange={(e) => set('notify.webhook', e.target.value)} placeholder="https://hooks.slack.com/…" /></label>

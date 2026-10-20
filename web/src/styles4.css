@@ -216,3 +216,9 @@ table.rows td.act { text-align: right; white-space: nowrap; width: 1%; }
 .chat-input { position: sticky; bottom: 0; display: flex; gap: 8px; align-items: flex-end; background: var(--bg); padding: 10px 0 0; }
 .chat-input textarea { flex: 1; resize: none; min-height: 40px; max-height: 160px; padding: 9px 12px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--surface); field-sizing: content; }
 .optrow { display: flex; align-items: center; gap: 14px; cursor: pointer; }
+
+.alert-info { margin: 6px 0 4px; padding: 8px 12px; border-left: 2px solid var(--line-strong); background: var(--surface-2); border-radius: 0 6px 6px 0; max-width: 78ch; }
+.alert-info p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.alert-info p.todo { margin-top: 4px; color: var(--text); }
+.alert-info.compact { background: none; border: 0; padding: 0; margin: 2px 0 0; }
+.alert-info.compact p { font-size: 12px; }

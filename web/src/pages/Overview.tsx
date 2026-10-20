@@ -1,3 +1,4 @@
+import { AlertInfo } from '../components/AlertInfo';
 import { useState } from 'react';
 import { api, usePoll, ago, uptime, rate, pct, SEV_COLOR, SEVERITIES } from '../lib';
 import { useT } from '../i18n';
@@ -116,6 +117,7 @@ export function Overview() {
               <div>
                 <div style={{ fontWeight: 600 }}>{t(`rule.${a.rule.split(':')[0]}`)} <span className="muted" style={{ fontWeight: 400 }}>· {a.agent}</span></div>
                 <div className="muted" style={{ fontSize: 12.5 }}>{a.message}</div>
+                <AlertInfo rule={a.rule} compact />
               </div>
               <span className="muted num">{ago(a.opened)}</span>
             </div>
