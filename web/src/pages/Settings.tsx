@@ -9,7 +9,7 @@ export function Settings({ tab: tabParam }: { tab?: string }) {
   const t = useT();
   const user = useUser();
   const isAdmin = user.role === 'admin';
-  const tabs = isAdmin ? ['enroll', 'users', 'notify', 'domain', 'audit', 'account'] : ['account'];
+  const tabs = isAdmin ? ['enroll', 'users', 'notify', 'detect', 'domain', 'audit', 'account'] : ['account'];
   const tab = tabs.includes(tabParam ?? '') ? tabParam! : tabs[0];
   return (
     <>
@@ -20,6 +20,7 @@ export function Settings({ tab: tabParam }: { tab?: string }) {
       {tab === 'enroll' && <AddHost />}
       {tab === 'users' && <Users />}
       {tab === 'notify' && <Notify />}
+      {tab === 'detect' && <Detect />}
       {tab === 'domain' && <Domain />}
       {tab === 'audit' && <Audit />}
       {tab === 'account' && <Account />}
@@ -123,6 +124,61 @@ function Notify() {
         <button className="btn" onClick={() => api('/settings/test-notify', { method: 'POST', body: {} })}>{t('notify.test')}</button>
         <span className="muted">{msg}</span>
       </div>
+    </div>
+  );
+}
+
+function Detect() {
+  const t = useT();
+  const { data, refresh } = usePoll(() => api<any>('/rules'), 15000);
+  const [hours, setHours] = useState<string | null>(null);
+  const [err, setErr] = useState('');
+  if (!data) return null;
+  const put = async (path: string, body: unknown) => {
+    setErr('');
+    try {
+      await api(path, { method: 'PUT', body });
+      refresh();
+    } catch (x) {
+      setErr(t(`err.${(x as Error).message}`));
+    }
+  };
+  const groups = ['access', 'accounts', 'persistence', 'processes', 'system'];
+  return (
+    <div className="grid" style={{ maxWidth: 880 }}>
+      <Card title={t('detect.title')}>
+        <p className="muted" style={{ marginTop: 0 }}>{t('detect.intro')}</p>
+        <div className="row wrap" style={{ gap: 16, alignItems: 'flex-end' }}>
+          <label className="field">{t('detect.min_sev')}
+            <select value={data.minSeverity} onChange={(e) => put('/rules', { minSeverity: e.target.value })}>
+              {['info', 'low', 'medium', 'high', 'critical'].map((s) => <option key={s} value={s}>{t(`sev.${s}`)}</option>)}
+            </select>
+          </label>
+          <label className="field">{t('detect.hours')}
+            <input value={hours ?? data.workHours} onChange={(e) => setHours(e.target.value)} onBlur={() => hours !== null && put('/rules', { workHours: hours }).then(() => setHours(null))} style={{ width: 110 }} />
+          </label>
+          <span className="muted" style={{ fontSize: 12 }}>{t('detect.hours_help')}</span>
+        </div>
+        {err && <div className="error" role="alert" style={{ marginTop: 8 }}>{err}</div>}
+      </Card>
+      {groups.map((g) => (
+        <Card key={g} title={t(`rulegrp.${g}`)} flush>
+          {data.rules.filter((r: any) => r.group === g).map((r: any) => (
+            <div key={r.id} className="finding" style={{ gridTemplateColumns: 'auto 1fr auto', alignItems: 'center' }}>
+              <label className="switch" title={r.enabled ? 'on' : 'off'}>
+                <input type="checkbox" checked={r.enabled} onChange={(e) => put(`/rules/${r.id}`, { enabled: e.target.checked })} aria-label={t(`rule.${r.id}`)} />
+              </label>
+              <div>
+                <div className="t">{t(`rule.${r.id}`)}</div>
+                <div className="d" style={{ gridColumn: 'auto' }}>{t(`ruledesc.${r.id}`)}</div>
+              </div>
+              <select value={r.severity} onChange={(e) => put(`/rules/${r.id}`, { severity: e.target.value })} aria-label="severity">
+                {['critical', 'high', 'medium', 'low'].map((s) => <option key={s} value={s}>{t(`sev.${s}`)}{s === r.defaultSeverity ? ` (${t('detect.default')})` : ''}</option>)}
+              </select>
+            </div>
+          ))}
+        </Card>
+      ))}
     </div>
   );
 }

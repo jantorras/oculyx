@@ -1,8 +1,11 @@
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync, openSync, readSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
-import { hp, readText, isLinux } from './host.ts';
+import { hp, readText, isLinux, HOST_ROOT } from './host.ts';
+import { IntrusionWatcher } from './intrusion.ts';
 import { inspect, listContainers } from './docker.ts';
+import { hardeningChecks } from './hardening.ts';
 import type { AgentEvent, Finding, Port, SecuritySnapshot } from './protocol.ts';
 
 const RISKY_PORTS: Record<number, string> = {
@@ -11,11 +14,38 @@ const RISKY_PORTS: Record<number, string> = {
 };
 const FIM_FILES = ['etc/passwd', 'etc/shadow', 'etc/sudoers', 'etc/ssh/sshd_config', 'root/.ssh/authorized_keys', 'etc/crontab', 'etc/hosts'];
 
+const SUSPICIOUS: { re: RegExp; reason: string; severity: AgentEvent['severity'] }[] = [
+  { re: /^\S*(ba|da|z|k|a|c)?sh(\s+-\w+)*\s*$/, reason: 'interactive root shell', severity: 'medium' },
+  { re: /^\S*\/su(\s+-\w*)?(\s+root)?\s*$/, reason: 'switch to root', severity: 'medium' },
+  { re: /\b(chmod|chown)\b.*(\bu\+s\b|\+s\b|\b[2467][0-7]{3}\b)/, reason: 'setting the SUID/SGID bit', severity: 'high' },
+  { re: /\b(useradd|adduser|usermod|userdel|chpasswd|visudo)\b/, reason: 'account or sudoers change', severity: 'high' },
+  { re: /\bpasswd\b(?!\s+-[lSe])/, reason: 'password change', severity: 'medium' },
+  { re: /\b(nc|ncat|netcat|socat)\b.*(\s-e\b|\sexec:|\s-c\b)/, reason: 'network shell tool', severity: 'critical' },
+  { re: /\/dev\/(tcp|udp)\//, reason: 'raw network redirection', severity: 'critical' },
+  { re: /\b(curl|wget)\b[^|]*\|\s*(sudo\s+)?(ba|da|z)?sh\b/, reason: 'downloaded script piped to a shell', severity: 'high' },
+  { re: /\bbase64\b.*(-d|--decode)/, reason: 'decoding a payload', severity: 'high' },
+  { re: /\b(python\d?|perl|ruby|php)\b.*\s-(c|e|r)\s.*(socket|exec|system|subprocess|pty)/, reason: 'scripted network shell', severity: 'critical' },
+  { re: /\b(history\s+-c|HISTFILE=|HISTSIZE=0|unset\s+HISTFILE)/, reason: 'clearing command history', severity: 'high' },
+  { re: /\b(rm|truncate|shred)\b.*\/var\/log\//, reason: 'deleting logs', severity: 'critical' },
+  { re: /\b(iptables|ip6tables|nft)\b.*(-F\b|flush)|\bufw\b.*\b(disable|reset)\b/, reason: 'disabling the firewall', severity: 'high' },
+  { re: /\bsystemctl\b.*\b(stop|disable|mask)\b.*\b(auditd|rsyslog|fail2ban|ufw|apparmor|oculyx)/, reason: 'stopping a security service', severity: 'high' },
+  { re: /\bcrontab\b|\bat\s+now\b/, reason: 'scheduling a task', severity: 'medium' },
+  { re: /\b(chattr)\s+[-+]i\b/, reason: 'making files immutable', severity: 'high' },
+];
+
+export function suspiciousCommand(cmd: string): { reason: string; severity: AgentEvent['severity'] } | null {
+  const c = cmd.trim();
+  for (const r of SUSPICIOUS) if (r.re.test(c)) return { reason: r.reason, severity: r.severity };
+  return null;
+}
+
 export class SecurityScanner {
   private events: AgentEvent[] = [];
   private knownPorts: Set<string> | null = null;
   private failures = new Map<string, { at: number[]; users: Set<string> }>();
   private authOffset = new Map<string, number>();
+  private journalCursor = '';
+  private watcher: IntrusionWatcher;
   private fimBaseline: Record<string, string> = {};
   private fimFile: string;
 
@@ -26,6 +56,24 @@ export class SecurityScanner {
     this.dockerOn = dockerOn;
     this.fimFile = join(stateDir, 'fim.json');
     if (existsSync(this.fimFile)) this.fimBaseline = JSON.parse(readFileSync(this.fimFile, 'utf8'));
+    this.watcher = new IntrusionWatcher(stateDir, (e) => this.events.push(e));
+    this.loadAuthState();
+  }
+
+  /** Called every few seconds by the connection loop: log tailing and intrusion collectors. */
+  tick() {
+    if (!isLinux) return;
+    try {
+      this.pollAuth();
+    } catch {
+      /* never break the loop */
+    }
+    this.watcher.tick();
+  }
+
+  /** The panel changed authorized_keys itself; do not report that as an intruder's key. */
+  acceptKeys() {
+    this.watcher.acceptKeys();
   }
 
   drainEvents(): AgentEvent[] {
@@ -40,13 +88,17 @@ export class SecurityScanner {
     for (const p of ports.filter((x) => x.exposed && RISKY_PORTS[x.port])) {
       findings.push({ checkId: `port:${p.proto}:${p.port}`, severity: p.port === 2375 ? 'critical' : 'high', title: `${RISKY_PORTS[p.port]} exposed on port ${p.port}`, detail: `Listening on ${p.addr}:${p.port}/${p.proto}. Bind it to localhost or restrict it with a firewall.` });
     }
-    findings.push(...this.sshConfig(), ...this.accounts(), ...this.firewall(), ...this.fim(), ...this.authLog(), ...this.systemState());
+    findings.push(...hardeningChecks(() => this.exposedTcpPorts()), ...this.accounts(), ...this.fim(), ...this.authLog(), ...this.systemState());
     if (this.dockerOn()) findings.push(...(await this.dockerChecks().catch(() => [])));
     return { findings, ports };
   }
 
   // ---- listening sockets, straight from /proc ----
-  private listeningPorts(): Port[] {
+  exposedTcpPorts(): number[] {
+    return this.listeningPorts().filter((p) => p.exposed && p.proto.startsWith('tcp')).map((p) => p.port);
+  }
+
+  listeningPorts(): Port[] {
     const out: Port[] = [];
     for (const [file, proto, v6] of [['proc/net/tcp', 'tcp', false], ['proc/net/tcp6', 'tcp6', true], ['proc/net/udp', 'udp', false]] as const) {
       const txt = readText(hp(file));
@@ -75,22 +127,6 @@ export class SecurityScanner {
     this.knownPorts = now;
   }
 
-  // ---- sshd hardening ----
-  private sshConfig(): Finding[] {
-    const txt = readText(hp('etc/ssh/sshd_config'));
-    if (!txt) return [];
-    const val = (k: string) => {
-      const m = [...txt.matchAll(new RegExp(`^\\s*${k}\\s+(\\S+)`, 'gim'))].pop();
-      return m?.[1].toLowerCase();
-    };
-    const out: Finding[] = [];
-    const root = val('PermitRootLogin');
-    if (root === 'yes') out.push({ checkId: 'ssh:root-login', severity: 'high', title: 'SSH permits root login', detail: 'Set "PermitRootLogin no" (or prohibit-password) in sshd_config.' });
-    if (val('PasswordAuthentication') !== 'no') out.push({ checkId: 'ssh:password-auth', severity: 'medium', title: 'SSH password authentication enabled', detail: 'Prefer key-based auth: "PasswordAuthentication no".' });
-    if (val('PermitEmptyPasswords') === 'yes') out.push({ checkId: 'ssh:empty-pw', severity: 'critical', title: 'SSH permits empty passwords', detail: 'Set "PermitEmptyPasswords no".' });
-    return out;
-  }
-
   // ---- local accounts ----
   private accounts(): Finding[] {
     const out: Finding[] = [];
@@ -101,13 +137,6 @@ export class SecurityScanner {
     const empty = shadow?.split('\n').filter((l) => l.split(':')[1] === '').map((l) => l.split(':')[0]).filter(Boolean) ?? [];
     if (empty.length) out.push({ checkId: 'acct:empty-pw', severity: 'critical', title: 'Accounts with empty password', detail: empty.join(', ') });
     return out;
-  }
-
-  private firewall(): Finding[] {
-    const ufw = readText(hp('etc/ufw/ufw.conf'));
-    const hasFw = (ufw && /ENABLED=yes/i.test(ufw)) || existsSync(hp('etc/nftables.conf')) || existsSync(hp('usr/sbin/firewalld'));
-    if (ufw === null && !hasFw) return [];
-    return hasFw ? [] : [{ checkId: 'fw:inactive', severity: 'medium', title: 'No active host firewall detected', detail: 'ufw is installed but disabled. Enable it: ufw allow OpenSSH && ufw enable' }];
   }
 
   private systemState(): Finding[] {
@@ -162,9 +191,11 @@ export class SecurityScanner {
     this.saveBaseline(cur);
   }
 
-  // ---- auth log: brute force detection ----
-  private authLog(): Finding[] {
+  // ---- auth log: logins, brute force, sudo, su ----
+  /** Reads whatever the auth log (or the journal) gained since the last call. Runs every few seconds. */
+  pollAuth() {
     const now = Date.now();
+    let anyFile = false;
     for (const file of ['var/log/auth.log', 'var/log/secure']) {
       const path = hp(file);
       let size: number;
@@ -173,7 +204,9 @@ export class SecurityScanner {
       } catch {
         continue;
       }
-      let start = this.authOffset.get(file) ?? Math.max(0, size - 256 * 1024);
+      anyFile = true;
+      let start = this.authOffset.get(file);
+      if (start === undefined) start = size; // first run: only look forward
       if (size < start) start = 0; // rotated
       const len = Math.min(size - start, 1024 * 1024);
       if (len > 0) {
@@ -184,20 +217,70 @@ export class SecurityScanner {
         this.parseAuth(buf.toString('utf8'), now);
       }
       this.authOffset.set(file, start + len);
+      this.saveAuthState();
     }
+    if (!anyFile) this.pollJournal(now);
+  }
+
+  private authStateFile() {
+    return join(this.stateDir, 'auth-state.json');
+  }
+  private saveAuthState() {
+    try {
+      writeFileSync(this.authStateFile(), JSON.stringify({ offsets: Object.fromEntries(this.authOffset), cursor: this.journalCursor }));
+    } catch {
+      /* best effort */
+    }
+  }
+  private loadAuthState() {
+    try {
+      const j = JSON.parse(readFileSync(this.authStateFile(), 'utf8'));
+      for (const [k, v] of Object.entries(j.offsets ?? {})) this.authOffset.set(k, Number(v));
+      this.journalCursor = j.cursor ?? '';
+    } catch {
+      /* first run */
+    }
+  }
+
+  /** Debian 12+ and other journald-only systems have no /var/log/auth.log. */
+  private pollJournal(now: number) {
+    if (HOST_ROOT) return; // the container has no journalctl
+    const args = ['--no-pager', '-q', '-o', 'short-iso', '--show-cursor', '-t', 'sshd', '-t', 'sshd-session', '-t', 'sudo', '-t', 'su'];
+    if (this.journalCursor) args.push('--after-cursor', this.journalCursor);
+    else args.push('--since', '-1min');
+    let out: string;
+    try {
+      out = execFileSync('journalctl', args, { encoding: 'utf8', timeout: 10_000, maxBuffer: 8 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch {
+      return;
+    }
+    const lines = out.split('\n');
+    const cur = lines.reverse().find((l) => l.startsWith('-- cursor: '));
+    if (cur) this.journalCursor = cur.slice(11).trim();
+    this.parseAuth(out.split('\n').filter((l) => !l.startsWith('-- cursor')).join('\n'), now);
+    this.saveAuthState();
+  }
+
+  private bruteForceFindings(): Finding[] {
+    const now = Date.now();
     const out: Finding[] = [];
     for (const [ip, v] of this.failures) {
       v.at = v.at.filter((t) => now - t < 3600_000);
       if (!v.at.length) this.failures.delete(ip);
-      else if (v.at.length >= 10) out.push({ checkId: `ssh:bruteforce:${ip}`, severity: 'high', title: `SSH brute-force from ${ip}`, detail: `${v.at.length} failed logins in the last hour (users: ${[...v.users].slice(0, 6).join(', ')}). Consider blocking the address or installing fail2ban.` });
+      else if (v.at.length >= 10) out.push({ checkId: `ssh:bruteforce:${ip}`, severity: 'high', title: `SSH brute-force from ${ip}`, detail: `${v.at.length} failed logins in the last hour (users: ${[...v.users].slice(0, 6).join(', ')}). Install fail2ban from the host's hardening list, or block the address.` });
     }
     return out;
+  }
+
+  private authLog(): Finding[] {
+    this.pollAuth();
+    return this.bruteForceFindings();
   }
 
   private parseAuth(text: string, now: number) {
     const burst = new Map<string, number>();
     for (const line of text.split('\n')) {
-      const f = line.match(/Failed (?:password|publickey) for (?:invalid user )?(\S+) from (\S+)/) ?? line.match(/Invalid user (\S+) from (\S+)/);
+      const f = line.match(/Failed (?:password|publickey|keyboard-interactive\S*) for (?:invalid user )?(\S+) from (\S+)/) ?? line.match(/Invalid user (\S+) from (\S+)/);
       if (f) {
         const rec = this.failures.get(f[2]) ?? { at: [], users: new Set<string>() };
         rec.at.push(now);
@@ -206,10 +289,24 @@ export class SecurityScanner {
         burst.set(f[2], (burst.get(f[2]) ?? 0) + 1);
         continue;
       }
-      const ok = line.match(/Accepted (password|publickey) for (\S+) from (\S+)/);
-      if (ok) this.events.push({ type: 'ssh_login', severity: ok[1] === 'password' ? 'low' : 'info', message: `SSH login: ${ok[2]} from ${ok[3]} (${ok[1]})`, data: { user: ok[2], ip: ok[3], method: ok[1] } });
+      const ok = line.match(/Accepted (\S+) for (\S+) from (\S+)/);
+      if (ok) {
+        const method = ok[1].startsWith('keyboard') ? 'password' : ok[1];
+        this.events.push({ type: 'ssh_login', severity: method === 'password' ? 'low' : 'info', message: `SSH login: ${ok[2]} from ${ok[3]} (${method})`, data: { user: ok[2], ip: ok[3], method } });
+        const rec = this.failures.get(ok[3]);
+        const recent = rec ? rec.at.filter((t) => now - t < 3600_000).length : 0;
+        if (recent >= 3) this.events.push({ type: 'ssh_login_after_failures', severity: 'critical', message: `${ok[2]} logged in from ${ok[3]} right after ${recent} failed attempts from the same address: the password may have been guessed`, data: { user: ok[2], ip: ok[3], failures: recent } });
+        continue;
+      }
       const sudo = line.match(/sudo:\s+(\S+) : .*COMMAND=(.+)$/);
-      if (sudo) this.events.push({ type: 'sudo', severity: 'info', message: `sudo by ${sudo[1]}: ${sudo[2].slice(0, 120)}`, data: { user: sudo[1] } });
+      if (sudo) {
+        this.events.push({ type: 'sudo', severity: 'info', message: `sudo by ${sudo[1]}: ${sudo[2].slice(0, 120)}`, data: { user: sudo[1] } });
+        const why = suspiciousCommand(sudo[2]);
+        if (why) this.events.push({ type: 'sudo_suspicious', severity: why.severity, message: `Suspicious sudo by ${sudo[1]} (${why.reason}): ${sudo[2].slice(0, 140)}`, data: { user: sudo[1], reason: why.reason } });
+        continue;
+      }
+      const su = line.match(/su(?:\[\d+\])?: \(to (\S+)\) (\S+) on/) ?? line.match(/su(?:\[\d+\])?: Successful su for (\S+) by (\S+)/);
+      if (su) this.events.push({ type: 'su', severity: su[1] === 'root' ? 'low' : 'info', message: `su to ${su[1]} by ${su[2]}`, data: { to: su[1], user: su[2] } });
     }
     for (const [ip, n] of burst) if (n >= 5) this.events.push({ type: 'ssh_failed', severity: 'medium', message: `${n} failed SSH logins from ${ip}`, data: { ip, count: n } });
   }

@@ -1,5 +1,7 @@
 import type { Db } from './db.ts';
+import { createHash } from 'node:crypto';
 import { notify } from './notify.ts';
+import { sevRank } from './rules.ts';
 
 export const OFFLINE_AFTER_MS = 45_000;
 
@@ -30,7 +32,22 @@ export class Alerts {
     const open = this.db.get("SELECT id FROM alerts WHERE agent_id=? AND rule=? AND state!='closed'", agentId, rule);
     if (open) return;
     this.db.run('INSERT INTO alerts(agent_id,rule,severity,message,opened) VALUES(?,?,?,?,?)', agentId, rule, severity, message, Date.now());
-    void notify(this.db, { severity, title: `${this.agentName(agentId)}: ${rule}`, body: message });
+    this.send(agentId, rule, severity, message);
+  }
+
+  private send(agentId: number, rule: string, severity: string, message: string) {
+    const min = this.db.setting('notify.min_severity', 'low');
+    if (sevRank(severity) < sevRank(min)) return;
+    void notify(this.db, { severity, title: `${this.agentName(agentId)}: ${rule.split(':')[0].replaceAll('_', ' ')}`, body: message });
+  }
+
+  /** Alert for a one-off security event. One open alert per rule+key, so repeated noise does not pile up. */
+  raiseEvent(agentId: number, ruleId: string, severity: string, message: string, key: string) {
+    const rule = `${ruleId}:${createHash('sha1').update(key).digest('hex').slice(0, 8)}`;
+    const open = this.db.get("SELECT id FROM alerts WHERE agent_id=? AND rule=? AND state!='closed'", agentId, rule);
+    if (open) return;
+    this.db.run('INSERT INTO alerts(agent_id,rule,severity,message,opened) VALUES(?,?,?,?,?)', agentId, rule, severity, message, Date.now());
+    this.send(agentId, rule, severity, message);
   }
 
   resolve(agentId: number, rule: string) {
@@ -65,7 +82,7 @@ export class Alerts {
   }
 
   onFinding(agentId: number, severity: string, title: string) {
-    if (severity === 'critical') this.raise(agentId, `finding:${title}`.slice(0, 80), 'critical', title);
+    if (severity === 'critical' || severity === 'high') this.raise(agentId, `finding:${title}`.slice(0, 80), severity, title);
   }
 
   sweepOffline() {

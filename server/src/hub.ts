@@ -1,6 +1,7 @@
 import type { WebSocket } from 'ws';
 import type { Db } from './db.ts';
 import type { Alerts } from './alerts.ts';
+import { RuleEngine } from './rules.ts';
 
 interface Pending {
   resolve: (v: any) => void;
@@ -15,9 +16,11 @@ export class Hub {
   private seq = 0;
   private db: Db;
   private alerts: Alerts;
+  private rules: RuleEngine;
   constructor(db: Db, alerts: Alerts) {
     this.db = db;
     this.alerts = alerts;
+    this.rules = new RuleEngine(db, alerts);
   }
 
   isOnline(id: number) {
@@ -40,7 +43,7 @@ export class Hub {
     });
   }
 
-  command(agentId: number, action: string, args: Record<string, unknown> = {}): Promise<any> {
+  command(agentId: number, action: string, args: Record<string, unknown> = {}, timeoutMs = 20_000): Promise<any> {
     const ws = this.sockets.get(agentId);
     if (!ws) return Promise.reject(new Error('agent offline'));
     const id = `c${++this.seq}`;
@@ -48,7 +51,7 @@ export class Hub {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error('timeout'));
-      }, 20_000);
+      }, timeoutMs);
       this.pending.set(id, { resolve, reject, timer });
       ws.send(JSON.stringify({ t: 'cmd', id, action, args }));
     });
@@ -79,6 +82,7 @@ export class Hub {
       case 'events':
         for (const e of m.events ?? []) {
           this.db.run('INSERT INTO events(agent_id,ts,type,severity,message,data) VALUES(?,?,?,?,?,?)', agentId, e.ts ?? now, e.type, e.severity ?? 'info', e.message, JSON.stringify(e.data ?? {}));
+          this.rules.onEvent(agentId, { type: String(e.type), severity: String(e.severity ?? 'info'), message: String(e.message), data: e.data ?? {} });
         }
         break;
       case 'result': {
@@ -95,16 +99,16 @@ export class Hub {
 
   private ingestSecurity(agentId: number, m: any) {
     const now = Date.now();
-    const list: { checkId: string; severity: string; title: string; detail?: string }[] = m.findings ?? [];
+    const list: { checkId: string; severity: string; title: string; detail?: string; fix?: string }[] = m.findings ?? [];
     this.db.tx(() => {
       for (const f of list) {
         const prev = this.db.get('SELECT id,status FROM findings WHERE agent_id=? AND check_id=?', agentId, f.checkId);
         if (!prev) {
-          this.db.run('INSERT INTO findings(agent_id,check_id,severity,title,detail,first_seen,last_seen) VALUES(?,?,?,?,?,?,?)', agentId, f.checkId, f.severity, f.title, f.detail ?? '', now, now);
+          this.db.run('INSERT INTO findings(agent_id,check_id,severity,title,detail,first_seen,last_seen,fix) VALUES(?,?,?,?,?,?,?,?)', agentId, f.checkId, f.severity, f.title, f.detail ?? '', now, now, f.fix ?? null);
           this.alerts.onFinding(agentId, f.severity, f.title);
         } else {
           const status = prev.status === 'resolved' ? 'open' : prev.status;
-          this.db.run('UPDATE findings SET severity=?, title=?, detail=?, status=?, last_seen=? WHERE id=?', f.severity, f.title, f.detail ?? '', status, now, prev.id);
+          this.db.run('UPDATE findings SET severity=?, title=?, detail=?, status=?, last_seen=?, fix=? WHERE id=?', f.severity, f.title, f.detail ?? '', status, now, f.fix ?? null, prev.id);
         }
       }
       const keep = new Set(list.map((f) => f.checkId));

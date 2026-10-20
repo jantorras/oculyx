@@ -9,6 +9,7 @@ import { Alerts, OFFLINE_AFTER_MS, thresholds, DEFAULT_THRESHOLDS } from './aler
 import { Hub } from './hub.ts';
 import { notify } from './notify.ts';
 import { Tunnel, validTunnelToken, validHostname } from './tunnel.ts';
+import { RULES, ruleConfig } from './rules.ts';
 import { agentBundle, renderInstallScript, safeServerUrl, stampExe } from './installer.ts';
 import { hashPassword, verifyPassword, loadSecret, signToken, verifyToken, randomToken, sha256, hasRole, LoginLimiter, type Role } from './auth.ts';
 
@@ -157,7 +158,7 @@ app.get('/api/agents/:id', viewer, async (req, reply) => {
   const id = a.id;
   return {
     ...agentView(a, true),
-    findings: db.all("SELECT * FROM findings WHERE agent_id=? AND status!='resolved' ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, first_seen DESC", id),
+    findings: db.all("SELECT f.*, json_extract(?2,'$.canHarden') AS can_harden, json_extract(?2,'$.actions') AS actions FROM findings f WHERE f.agent_id=?1 AND status!='resolved' ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, first_seen DESC", id, a.info ?? null),
     alerts: db.all('SELECT * FROM alerts WHERE agent_id=? ORDER BY opened DESC LIMIT 30', id),
     events: db.all('SELECT * FROM events WHERE agent_id=? ORDER BY ts DESC LIMIT 50', id),
     canAct: hub.isOnline(id),
@@ -258,7 +259,7 @@ app.get('/api/agents/:id/containers/:cid/logs', viewer, async (req, reply) => {
 app.get('/api/findings', viewer, async (req) => {
   const { status = 'open' } = req.query as { status?: string };
   return db.all(
-    `SELECT f.*, g.name AS agent FROM findings f JOIN agents g ON g.id=f.agent_id WHERE f.status=?
+    `SELECT f.*, g.name AS agent, json_extract(g.info,'$.canHarden') AS can_harden, json_extract(g.info,'$.actions') AS actions FROM findings f JOIN agents g ON g.id=f.agent_id WHERE f.status=?
      ORDER BY CASE f.severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, f.first_seen DESC LIMIT 500`,
     status,
   );
@@ -284,6 +285,29 @@ app.post('/api/agents/:id/fim/accept', operator, async (req, reply) => {
     audit(req.user!.username, 'fim.accept', (req.params as any).id, req.ip);
     return { ok: true };
   } catch (e) {
+    return reply.code(502).send({ error: (e as Error).message });
+  }
+});
+
+// one-click hardening: the server only relays named fixes; the agent decides what they do
+app.post('/api/agents/:id/fix/preview', admin, async (req, reply) => {
+  const { fix } = (req.body ?? {}) as { fix?: string };
+  try {
+    return await hub.command(Number((req.params as any).id), 'harden.preview', { fix: String(fix ?? '') });
+  } catch (e) {
+    return reply.code(502).send({ error: (e as Error).message });
+  }
+});
+app.post('/api/agents/:id/fix', admin, async (req, reply) => {
+  const id = Number((req.params as any).id);
+  const { fix, args } = (req.body ?? {}) as { fix?: string; args?: Record<string, unknown> };
+  if (!/^[a-z0-9.-]{3,40}$/.test(String(fix ?? ''))) return reply.code(400).send({ error: 'bad_fix' });
+  try {
+    const out = await hub.command(id, 'harden.apply', { fix, args: args ?? {} }, 420_000);
+    audit(req.user!.username, 'harden.apply', `${id}:${fix}`, req.ip);
+    return out;
+  } catch (e) {
+    audit(req.user!.username, 'harden.failed', `${id}:${fix}`, req.ip);
     return reply.code(502).send({ error: (e as Error).message });
   }
 });
@@ -449,6 +473,38 @@ app.put('/api/settings', admin, async (req) => {
 
 app.post('/api/settings/test-notify', admin, async () => {
   await notify(db, { severity: 'info', title: 'Oculyx', body: 'Test notification' });
+  return { ok: true };
+});
+
+// ---------- detection rules ----------
+app.get('/api/rules', admin, async () => ({
+  rules: RULES.map((r) => ({ id: r.id, event: r.event, group: r.group, defaultSeverity: r.severity, defaultEnabled: r.enabled, ...ruleConfig(db, r) })),
+  minSeverity: db.setting('notify.min_severity', 'low'),
+  workHours: db.setting('detect.work_hours', '07-21'),
+}));
+app.put('/api/rules/:id', admin, async (req, reply) => {
+  const r = RULES.find((x) => x.id === (req.params as any).id);
+  if (!r) return reply.code(404).send({ error: 'not_found' });
+  const b = (req.body ?? {}) as { enabled?: boolean | null; severity?: string | null };
+  if (b.enabled !== undefined) db.setSetting(`rule.${r.id}.enabled`, b.enabled === null ? '' : b.enabled ? '1' : '0');
+  if (b.severity !== undefined) {
+    if (b.severity !== null && !['critical', 'high', 'medium', 'low'].includes(b.severity)) return reply.code(400).send({ error: 'bad_severity' });
+    db.setSetting(`rule.${r.id}.severity`, b.severity ?? '');
+  }
+  audit(req.user!.username, 'rule.update', r.id, req.ip);
+  return { ok: true };
+});
+app.put('/api/rules', admin, async (req, reply) => {
+  const b = (req.body ?? {}) as { minSeverity?: string; workHours?: string };
+  if (b.minSeverity !== undefined) {
+    if (!['info', 'low', 'medium', 'high', 'critical'].includes(b.minSeverity)) return reply.code(400).send({ error: 'bad_severity' });
+    db.setSetting('notify.min_severity', b.minSeverity);
+  }
+  if (b.workHours !== undefined) {
+    if (!/^\d{1,2}-\d{1,2}$/.test(b.workHours)) return reply.code(400).send({ error: 'bad_hours' });
+    db.setSetting('detect.work_hours', b.workHours);
+  }
+  audit(req.user!.username, 'rules.update', undefined, req.ip);
   return { ok: true };
 });
 

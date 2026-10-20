@@ -120,7 +120,8 @@ export class Connection {
           const events = this.p.drainEvents();
           if (events.length) this.send({ t: 'events', events });
         });
-        every(30_000, () => {
+        every(15_000, () => {
+          this.p.tick?.();
           const events = this.p.drainEvents();
           if (events.length) this.send({ t: 'events', events });
         });
@@ -130,7 +131,7 @@ export class Connection {
         if (m.t !== 'cmd') return;
         try {
           this.send({ t: 'result', id: m.id, ok: true, data: await this.p.command(m.action, m.args ?? {}) });
-          if (m.action.startsWith('docker.') || m.action.startsWith('fim.')) setTimeout(() => this.refreshSoon(), 500);
+          if (m.action.startsWith('docker.') || m.action.startsWith('fim.') || m.action.startsWith('harden.')) setTimeout(() => this.refreshSoon(), 500);
         } catch (e) {
           this.send({ t: 'result', id: m.id, ok: false, error: (e as Error).message });
         }

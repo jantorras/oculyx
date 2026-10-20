@@ -221,7 +221,7 @@ Restart=always
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=full
+$([ "$ALLOW_ACTIONS" = "true" ] || echo 'ProtectSystem=full')
 
 [Install]
 WantedBy=multi-user.target

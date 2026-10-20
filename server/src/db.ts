@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS audit (
   id INTEGER PRIMARY KEY, ts INTEGER NOT NULL, user TEXT, action TEXT NOT NULL, target TEXT, ip TEXT
 );
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS known_logins (
+  agent_id INTEGER NOT NULL, user TEXT NOT NULL, ip TEXT NOT NULL, first INTEGER NOT NULL, last INTEGER NOT NULL, n INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (agent_id, user, ip)
+);
 `;
 
 export type Row = Record<string, any>;
@@ -47,10 +51,12 @@ export class Db {
     this.raw = new DatabaseSync(path);
     this.raw.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=ON;');
     this.raw.exec(SCHEMA);
-    try {
-      this.raw.exec('ALTER TABLE enroll_tokens ADD COLUMN expires INTEGER');
-    } catch {
-      /* column already exists */
+    for (const alter of ['ALTER TABLE enroll_tokens ADD COLUMN expires INTEGER', 'ALTER TABLE findings ADD COLUMN fix TEXT']) {
+      try {
+        this.raw.exec(alter);
+      } catch {
+        /* column already exists */
+      }
     }
   }
   all(sql: string, ...p: any[]): Row[] {

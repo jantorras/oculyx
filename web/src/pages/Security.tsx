@@ -4,6 +4,7 @@ import { useT } from '../i18n';
 import { useUser, canOperate } from '../App';
 import { Card, Empty, SevPill, Skeleton, Tile } from '../components/ui';
 import { Donut, HBars, StackedBars } from '../components/Chart';
+import { FixDialog } from '../components/Fix';
 
 export function Security() {
   const t = useT();
@@ -78,6 +79,7 @@ function catRows(byCat: any[], t: (k: string) => string) {
 export function FindingList({ rows, showHost, onChange }: { rows: any[]; showHost?: boolean; onChange: () => void }) {
   const t = useT();
   const user = useUser();
+  const [fixing, setFixing] = useState<{ agent: number; fix: string } | null>(null);
   if (rows.length === 0) return <Empty>{t('security.none')}</Empty>;
   const act = async (id: number, action: string) => {
     await api(`/findings/${id}/${action}`, { method: 'POST', body: {} });
@@ -94,12 +96,18 @@ export function FindingList({ rows, showHost, onChange }: { rows: any[]; showHos
             {canOperate(user) && f.status === 'ignored' && <button className="btn sm" onClick={() => act(f.id, 'reopen')}>{t('security.reopen')}</button>}
           </div>
           {f.detail && <div className="d">{f.detail}</div>}
+          {f.fix && f.status === 'open' && user.role === 'admin' && (
+            f.can_harden
+              ? <button className="btn sm primary fixbtn" style={{ gridRow: 2 }} onClick={() => setFixing({ agent: f.agent_id, fix: f.fix })}>{t('fix.button')}</button>
+              : <span className="muted" style={{ gridColumn: 3, gridRow: 2, fontSize: 12 }} title={t('fix.unavailable_hint')}>{t('fix.unavailable')}</span>
+          )}
           <div className="m">
             {showHost && <><a href={`#/hosts/${f.agent_id}/security`} style={{ color: 'var(--accent)' }}>{f.agent}</a> · </>}
             <span className="mono">{f.check_id}</span> · {t('security.first_seen')} {ago(f.first_seen)}
           </div>
         </div>
       ))}
+      {fixing && <FixDialog agentId={fixing.agent} fix={fixing.fix} onClose={() => setFixing(null)} onDone={onChange} />}
     </>
   );
 }

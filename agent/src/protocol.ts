@@ -9,6 +9,10 @@ export interface HostInfo {
   docker: boolean;
   agentVersion: string;
   platform?: string;
+  /** actions enabled on this agent */
+  actions?: boolean;
+  /** this agent can change the system (native, root, actions enabled) */
+  canHarden?: boolean;
 }
 
 export interface MetricsSample {
@@ -42,6 +46,8 @@ export interface Finding {
   severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
   title: string;
   detail?: string;
+  /** id of a one-click remediation the agent can apply (see hardening.ts) */
+  fix?: string;
 }
 
 export interface Port {
@@ -71,5 +77,7 @@ export interface Provider {
   docker(): Promise<ContainerInfo[] | null>;
   security(): Promise<SecuritySnapshot>;
   drainEvents(): AgentEvent[];
+  /** called every few seconds for continuous collectors (log tailing, intrusion watchers) */
+  tick?(): void;
   command(action: string, args: Record<string, any>): Promise<unknown>;
 }

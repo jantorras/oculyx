@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useT } from '../i18n';
 import { scoreTone } from '../lib';
 
@@ -120,6 +120,23 @@ export function Skeleton({ kpis = 4, blocks = 2 }: { kpis?: number; blocks?: num
       </div>
       <div className="grid g2">
         {Array.from({ length: blocks }, (_, i) => <div key={i} className="sk sk-block" />)}
+      </div>
+    </div>
+  );
+}
+
+/** Centered dialog with a dimmed backdrop; Esc and a backdrop click close it. */
+export function Modal({ title, onClose, children, wide }: { title: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}>
+        <header><h2 className="grow">{title}</h2><button className="btn sm" onClick={onClose} aria-label="Close">×</button></header>
+        <div className="modal-body">{children}</div>
       </div>
     </div>
   );

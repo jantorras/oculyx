@@ -5,7 +5,7 @@ import { Card, Empty, SevPill } from '../components/ui';
 import { Columns } from '../components/Chart';
 import { SEV_COLOR } from '../lib';
 
-const TYPES = ['', 'ssh_failed', 'ssh_login', 'rdp_failed', 'rdp_login', 'sudo', 'fim', 'win_admin_change', 'port_opened'];
+const TYPES = ['', 'ssh_failed', 'ssh_login', 'ssh_login_after_failures', 'sudo', 'sudo_suspicious', 'su', 'user_created', 'privileged_group_added', 'ssh_key_added', 'persistence_changed', 'suid_added', 'reverse_shell', 'cryptominer', 'suspicious_process', 'unknown_kernel_module', 'fim', 'port_opened', 'rdp_failed', 'rdp_login', 'win_admin_change'];
 
 export function Events() {
   const t = useT();
