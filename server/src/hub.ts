@@ -23,6 +23,12 @@ export class Hub {
     this.rules = new RuleEngine(db, alerts);
   }
 
+  /** Drops a live connection (used when the host is removed so it cannot keep reporting). */
+  disconnect(id: number) {
+    this.sockets.get(id)?.close(4001, 'removed');
+    this.sockets.delete(id);
+  }
+
   isOnline(id: number) {
     return this.sockets.has(id);
   }

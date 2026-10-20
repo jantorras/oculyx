@@ -10,6 +10,7 @@ import { Security } from './pages/Security';
 import { Alerts } from './pages/Alerts';
 import { Events } from './pages/Events';
 import { Settings } from './pages/Settings';
+import { Servers } from './pages/Servers';
 
 export interface User {
   id: number;
@@ -66,6 +67,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
 
   const nav: [string, string, ReactNode, boolean?][] = [
     ['/', 'nav.overview', Icon.overview],
+    ['/servers', 'nav.servers', Icon.overview],
     ['/containers', 'nav.containers', Icon.docker],
     ['/security', 'nav.security', Icon.shield],
     ['/alerts', 'nav.alerts', Icon.bell],
@@ -81,6 +83,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
 
   let page: ReactNode;
   if (route.startsWith('/hosts/')) page = <HostDetail id={Number(route.split('/')[2])} tab={route.split('/')[3]} />;
+  else if (route === '/servers') page = <Servers />;
   else if (route === '/containers') page = <Containers />;
   else if (route === '/security') page = <Security />;
   else if (route === '/alerts') page = <Alerts />;

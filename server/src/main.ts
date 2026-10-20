@@ -215,14 +215,36 @@ app.get('/api/stats/timeline', viewer, async () => {
   });
 });
 
-app.delete('/api/agents/:id', admin, async (req) => {
-  const id = Number((req.params as any).id);
+/** Removes a host and everything stored about it; a still-connected agent is disconnected and loses its credentials. */
+function removeAgent(id: number, user: string, ip: string): boolean {
   const a = db.get('SELECT name FROM agents WHERE id=?', id);
+  if (!a) return false;
+  hub.disconnect(id);
   db.tx(() => {
-    for (const t of ['metrics', 'findings', 'alerts', 'events']) db.run(`DELETE FROM ${t} WHERE agent_id=?`, id);
+    for (const t of ['metrics', 'findings', 'alerts', 'events', 'known_logins']) db.run(`DELETE FROM ${t} WHERE agent_id=?`, id);
+    db.run('DELETE FROM ssh_access WHERE agent_id=?', id);
     db.run('DELETE FROM agents WHERE id=?', id);
   });
-  audit(req.user!.username, 'agent.delete', a?.name, req.ip);
+  audit(user, 'agent.delete', a.name, ip);
+  return true;
+}
+app.delete('/api/agents/:id', admin, async (req, reply) => {
+  if (!removeAgent(Number((req.params as any).id), req.user!.username, req.ip)) return reply.code(404).send({ error: 'not_found' });
+  return { ok: true };
+});
+app.post('/api/agents/delete', admin, async (req, reply) => {
+  const ids = ((req.body ?? {}) as { ids?: unknown }).ids;
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 200) return reply.code(400).send({ error: 'bad_request' });
+  let n = 0;
+  for (const id of ids) if (removeAgent(Number(id), req.user!.username, req.ip)) n++;
+  return { ok: true, removed: n };
+});
+app.patch('/api/agents/:id', admin, async (req, reply) => {
+  const id = Number((req.params as any).id);
+  const name = String(((req.body ?? {}) as { name?: string }).name ?? '').trim();
+  if (!/^[\w .@()-]{1,64}$/.test(name)) return reply.code(400).send({ error: 'bad_name' });
+  if (!db.run('UPDATE agents SET name=? WHERE id=?', name, id).changes) return reply.code(404).send({ error: 'not_found' });
+  audit(req.user!.username, 'agent.rename', name, req.ip);
   return { ok: true };
 });
 
