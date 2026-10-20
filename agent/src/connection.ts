@@ -1,5 +1,5 @@
 import WebSocket from 'ws';
-import { mkdirSync, readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, renameSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Provider } from './protocol.ts';
 
@@ -75,7 +75,13 @@ export class Connection {
         await this.session(creds);
         backoff = 1000;
       } catch (e) {
-        this.log(`${(e as Error).message}; retrying in ${backoff / 1000}s`);
+        const msg = (e as Error).message;
+        // the server no longer knows this agent (it was removed): enroll again if we were given a token
+        if (/401/.test(msg) && this.o.enrollToken && existsSync(this.credsFile())) {
+          this.log('credentials rejected; enrolling again with the token');
+          unlinkSync(this.credsFile());
+        }
+        this.log(`${msg}; retrying in ${backoff / 1000}s`);
       }
       await new Promise((r) => setTimeout(r, backoff));
       backoff = Math.min(backoff * 2, 30_000);
