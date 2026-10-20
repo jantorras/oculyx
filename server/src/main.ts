@@ -587,6 +587,57 @@ app.post('/api/agents/:id/ssh/deploy', admin, async (req, reply) => {
     return reply.code(502).send({ error: (e as Error).message });
   }
 });
+/**
+ * Turns SSH passwords (and optionally root passwords) off, then proves the key still works by logging in again.
+ * If that login fails the change is rolled back on the spot, so a mistake cannot lock the admin out.
+ */
+app.post('/api/agents/:id/ssh/lockdown', admin, async (req, reply) => {
+  const id = Number((req.params as any).id);
+  const { passwords, root } = (req.body ?? {}) as { passwords?: boolean; root?: boolean };
+  const acc = loadAccess(db, id);
+  const key = acc?.key_id ? db.get('SELECT fingerprint FROM ssh_keys WHERE id=?', acc.key_id) : null;
+  if (!acc || !key) return reply.code(400).send({ error: 'no_key' });
+  if (!acc.tested || Date.now() - acc.tested > 24 * 3600_000) return reply.code(400).send({ error: 'test_first' });
+  try {
+    const list = await hub.command(id, 'ssh.list');
+    if (!(list.keys ?? []).some((k: any) => k.fingerprint === key.fingerprint && k.user === acc.user)) return reply.code(400).send({ error: 'key_not_deployed' });
+    const steps: string[] = [];
+    if (root) steps.push(...(await hub.command(id, 'harden.apply', { fix: 'ssh.root-login' }, 60_000)).steps);
+    if (passwords) steps.push(...(await hub.command(id, 'harden.apply', { fix: 'ssh.password-auth', args: { confirm: true } }, 60_000)).steps);
+    // prove the way in still works; otherwise undo everything
+    let verified = false;
+    for (let i = 0; i < 4 && !verified; i++) {
+      await new Promise((r) => setTimeout(r, i ? 1500 : 800));
+      try {
+        const s = await sshSession(id);
+        await exec(s.client, 'echo ok');
+        s.client.end();
+        verified = true;
+      } catch {
+        /* retry */
+      }
+    }
+    if (!verified) {
+      await hub.command(id, 'harden.apply', { fix: 'ssh.revert' }, 60_000).catch(() => undefined);
+      audit(req.user!.username, 'ssh.lockdown.rolledback', id, req.ip);
+      return reply.code(409).send({ error: 'lockdown_rolled_back' });
+    }
+    audit(req.user!.username, 'ssh.lockdown', `${id}:${passwords ? 'passwords' : ''}${root ? ' root' : ''}`, req.ip);
+    return { ok: true, steps };
+  } catch (e) {
+    return reply.code(502).send({ error: (e as Error).message });
+  }
+});
+app.post('/api/agents/:id/ssh/unlock', admin, async (req, reply) => {
+  const id = Number((req.params as any).id);
+  try {
+    const out = await hub.command(id, 'harden.apply', { fix: 'ssh.revert' }, 60_000);
+    audit(req.user!.username, 'ssh.unlock', id, req.ip);
+    return out;
+  } catch (e) {
+    return reply.code(502).send({ error: (e as Error).message });
+  }
+});
 app.post('/api/agents/:id/ssh/revoke', admin, async (req, reply) => {
   const id = Number((req.params as any).id);
   const { user, fingerprint } = (req.body ?? {}) as { user?: string; fingerprint?: string };

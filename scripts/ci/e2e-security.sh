@@ -96,6 +96,11 @@ put /rules/user_removed '{"enabled":false}' >/dev/null
 get /rules | jq -e '.rules[] | select(.id=="user_removed") | .enabled == false' >/dev/null && ok "rule switched off"
 
 echo "== undo: remove the SSH changes"
+echo "== lockdown wizard: passwords off with a verified key login, then back"
+post "/agents/$ID/ssh/lockdown" '{"passwords":true}' | jq -e '.ok == true' >/dev/null && ok "lockdown applied and the key login was re-verified"
+sudo sshd -T | grep -qx 'passwordauthentication no' && ok "sshd refuses passwords"
+post "/agents/$ID/ssh/test" | jq -e '.ok == true' >/dev/null && ok "key login still works after the lockdown"
+post "/agents/$ID/ssh/unlock" '{}' >/dev/null && ok "unlock restored the previous settings"
 post "/agents/$ID/fix" '{"fix":"ssh.revert"}' >/dev/null && ok "ssh.revert"
 test ! -e /etc/ssh/sshd_config.d/00-oculyx.conf && ok "drop-in removed"
 sudo userdel -r ocx-intruder 2>/dev/null || true

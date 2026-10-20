@@ -26,7 +26,7 @@ function accounts(): { user: string; uid: number; gid: number; home: string }[] 
 }
 
 /** Every authorized key on the host, per account. Read-only. */
-export function listHostKeys(): { keys: HostKey[]; users: string[]; passwordAuth: string | null } {
+export function listHostKeys(): { keys: HostKey[]; users: string[]; passwordAuth: string | null; permitRootLogin: string | null; managed: boolean } {
   const keys: HostKey[] = [];
   const acc = accounts().filter((a) => a.uid === 0 || a.uid >= 1000);
   for (const a of acc) {
@@ -37,7 +37,8 @@ export function listHostKeys(): { keys: HostKey[]; users: string[]; passwordAuth
       }
     }
   }
-  return { keys, users: acc.map((a) => a.user), passwordAuth: sshdConfig()?.['passwordauthentication'] ?? null };
+  const cfg = sshdConfig();
+  return { keys, users: acc.map((a) => a.user), passwordAuth: cfg?.['passwordauthentication'] ?? null, permitRootLogin: cfg?.['permitrootlogin'] ?? null, managed: existsSync(hp('etc/ssh/sshd_config.d/00-oculyx.conf')) || (readText(hp('etc/ssh/sshd_config')) ?? '').includes('oculyx managed') };
 }
 
 export function authorizeKey(user: string, publicKey: string): { steps: string[] } {

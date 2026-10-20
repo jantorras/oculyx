@@ -52,43 +52,109 @@ export function SshAccess({ agentId, name, onGoSecurity }: { agentId: number; na
     return t('ssh.test_ok', { user: r.user, host: r.hostname });
   });
 
-  const step = (n: number, done: boolean, title: string, body: React.ReactNode) => (
-    <div className="row" style={{ gap: 12, alignItems: 'flex-start', padding: '10px 0', borderTop: n > 1 ? '1px solid var(--line)' : 0 }}>
-      <span style={{ width: 22, height: 22, borderRadius: 99, display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 650, flex: 'none', background: done ? 'var(--ok)' : 'var(--surface-2)', color: done ? '#04130d' : 'var(--muted)', border: '1px solid var(--line-strong)' }}>{done ? '✓' : n}</span>
-      <div className="grow"><div style={{ fontWeight: 600 }}>{title}</div><div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{body}</div></div>
+  const saveAccess = (patch: Partial<{ host: string; port: number; user: string; keyId: number | null }>) =>
+    api(`/agents/${agentId}/ssh`, { method: 'PUT', body: { host: f.host, port: Number(f.port), user: f.user, keyId: f.keyId ? Number(f.keyId) : null, ...patch } });
+  const createKey = () => run('key', async () => {
+    const k = await api<any>('/ssh/keys', { body: { name: `panel-${name}`.slice(0, 40) } });
+    await saveAccess({ keyId: k.id });
+    setForm(null);
+  });
+  const useKey = (id: string) => run('key', async () => { await saveAccess({ keyId: id ? Number(id) : null }); setForm(null); });
+  const lock = (body: { passwords?: boolean; root?: boolean }) => run('lock', async () => {
+    await api(`/agents/${agentId}/ssh/lockdown`, { body });
+    return t('sshw.done_locked');
+  });
+  const unlock = () => run('lock', async () => { await api(`/agents/${agentId}/ssh/unlock`, { body: {} }); return t('sshw.done_unlocked'); });
+
+  const hk = data.hostKeys ?? {};
+  const pwOff = hk.passwordAuth === 'no';
+  const rootMode: string = hk.permitRootLogin ?? '';
+  const rootLabel = rootMode === 'no' ? t('sshw.root_no') : rootMode === 'prohibit-password' || rootMode === 'without-password' ? t('sshw.root_key') : t('sshw.root_yes');
+  const ready = !!key && deployed && tested;
+  const canChange = data.canHarden === true;
+
+  const step = (n: number, done: boolean, title: string, why: string, body: React.ReactNode) => (
+    <div className="row" style={{ gap: 14, alignItems: 'flex-start', padding: '14px 0', borderTop: n > 1 ? '1px solid var(--line)' : 0 }}>
+      <span style={{ width: 24, height: 24, borderRadius: 99, display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 650, flex: 'none', background: done ? 'var(--ok)' : 'var(--surface-2)', color: done ? '#04130d' : 'var(--muted)', border: '1px solid var(--line-strong)' }}>{done ? '✓' : n}</span>
+      <div className="grow" style={{ minWidth: 0 }}>
+        <div style={{ fontWeight: 600 }}>{title}</div>
+        <div className="muted" style={{ fontSize: 13, margin: '3px 0 10px', maxWidth: '70ch' }}>{why}</div>
+        {body}
+      </div>
     </div>
   );
 
   return (
     <div className="grid" style={{ maxWidth: 960 }}>
-      <Card title={t('ssh.connection')}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 12, alignItems: 'end' }}>
-          <label className="field">{t('ssh.host')}<input value={f.host} onChange={(e) => setForm({ ...f, host: e.target.value })} placeholder="192.168.1.20" spellCheck={false} /></label>
-          <label className="field">{t('ssh.port')}<input type="number" min={1} max={65535} value={f.port} onChange={(e) => setForm({ ...f, port: e.target.value })} /></label>
-          <label className="field">{t('ssh.user')}<input value={f.user} onChange={(e) => setForm({ ...f, user: e.target.value })} spellCheck={false} /></label>
-        </div>
-        <label className="field">{t('ssh.key')}
-          <select value={f.keyId} onChange={(e) => setForm({ ...f, keyId: e.target.value })}>
-            <option value="">{t('ssh.no_key')}</option>
-            {(keys ?? []).map((k) => <option key={k.id} value={k.id}>{k.name} · {k.fingerprint.slice(0, 22)}…</option>)}
-          </select>
-        </label>
-        {(keys ?? []).length === 0 && <p className="muted" style={{ fontSize: 13 }}>{t('ssh.no_keys_yet')} <a href="#/settings/sshkeys" style={{ color: 'var(--accent)' }}>{t('ssh.create_key')}</a></p>}
-        {acc.hostkey && <p className="muted mono" style={{ fontSize: 11.5, margin: '10px 0 0' }}>{t('ssh.pinned')}: {acc.hostkey} <button className="btn sm" style={{ marginLeft: 8 }} onClick={() => run('reset', async () => { await api(`/agents/${agentId}/ssh`, { method: 'PUT', body: { resetHostKey: true } }); })}>{t('ssh.forget')}</button></p>}
-        <div className="row" style={{ gap: 8, marginTop: 12 }}>
-          <button className="btn" disabled={!!busy || !form} onClick={save}>{t('common.save')}</button>
-          <button className="btn" disabled={!!busy || !f.keyId} onClick={test}>{busy === 'test' ? t('ssh.testing') : t('ssh.test')}</button>
-          <button className="btn primary" disabled={!!busy || !f.keyId || !tested || !!form} onClick={() => setTerm(true)}>{t('ssh.open_terminal')}</button>
-        </div>
+      <Card title={t('sshw.title')}>
+        <p className="muted" style={{ marginTop: 0, fontSize: 13.5 }}>{t('sshw.intro')}</p>
+        {!canChange && <div className="warn" style={{ marginBottom: 8 }}>{t('sshw.readonly')}</div>}
+        {step(1, !!key, t('sshw.s1'), t('sshw.s1_why'), key ? <span className="pill">{t('sshw.s1_done', { name: key.name })}</span> : (
+          <div className="row wrap" style={{ gap: 8 }}>
+            <button className="btn primary" disabled={!!busy || !f.host} onClick={createKey}>{t('sshw.s1_btn_create')}</button>
+            {(keys ?? []).length > 0 && (
+              <select value="" onChange={(e) => e.target.value && useKey(e.target.value)} aria-label={t('sshw.s1_btn_use')}>
+                <option value="">{t('sshw.s1_btn_use')}…</option>
+                {(keys ?? []).map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+              </select>
+            )}
+            {!f.host && <span className="muted" style={{ fontSize: 12.5 }}>{t('ssh.host')}: {t('sshw.advanced')} ↓</span>}
+          </div>
+        ))}
+        {step(2, deployed, t('sshw.s2'), t('sshw.s2_why'), deployed ? <span className="pill">{t('sshw.s2_done', { user: hostKeys.find((k) => k.fingerprint === key?.fingerprint)?.user ?? du })}</span> : (
+          <div className="row wrap" style={{ gap: 8, alignItems: 'center' }}>
+            <select value={du} onChange={(e) => setDeployUser(e.target.value)} aria-label={t('sshw.s2_account')}>{users.map((u) => <option key={u}>{u}</option>)}</select>
+            <button className="btn primary" disabled={!key || !canChange || !!busy} onClick={() => run('deploy', async () => { await saveAccess({ user: du }); setForm(null); const r = await api<any>(`/agents/${agentId}/ssh/deploy`, { body: { keyId: key.id, user: du } }); return r.steps?.join(' · '); })}>{t('sshw.s2_btn')}</button>
+          </div>
+        ))}
+        {step(3, tested, t('sshw.s3'), t('sshw.s3_why'), (
+          <div className="row wrap" style={{ gap: 8, alignItems: 'center' }}>
+            <button className={tested ? 'btn' : 'btn primary'} disabled={!key || !deployed || !!busy} onClick={test}>{busy === 'test' ? t('ssh.testing') : tested ? t('ssh.test') : t('sshw.s3_btn')}</button>
+            {tested && <span className="pill">{t('sshw.s3_done')}</span>}
+            <button className="btn" disabled={!ready || !!busy} onClick={() => setTerm(true)}>{t('ssh.open_terminal')}</button>
+          </div>
+        ))}
+        {step(4, pwOff, t('sshw.s4'), t('sshw.s4_why'), (
+          <div className="grid" style={{ gap: 10 }}>
+            <div className="row wrap" style={{ gap: 8, alignItems: 'center' }}>
+              <span className="pill" style={{ color: pwOff ? 'var(--ok)' : undefined }}>{pwOff ? t('sshw.pw_off') : t('sshw.pw_on')}</span>
+              {pwOff
+                ? <button className="btn" disabled={!canChange || !!busy} onClick={() => confirm(t('ssh.confirm_revoke')) && unlock()}>{t('sshw.pw_btn_on')}</button>
+                : <button className="btn primary" disabled={!ready || !canChange || !!busy} onClick={() => lock({ passwords: true, root: rootMode === 'yes' })}>{busy === 'lock' ? t('sshw.working') : t('sshw.pw_btn_off')}</button>}
+              {!ready && !pwOff && <span className="muted" style={{ fontSize: 12.5 }}>{t('sshw.need_steps')}</span>}
+            </div>
+            <div className="muted" style={{ fontSize: 12.5 }}>{t('sshw.s4_safety')}</div>
+            <div className="row wrap" style={{ gap: 8, alignItems: 'center' }}>
+              <span className="muted" style={{ fontSize: 13 }}>{t('sshw.root_label')}: <b>{rootLabel}</b></span>
+              {rootMode === 'yes' && <button className="btn sm" disabled={!ready || !canChange || !!busy} onClick={() => lock({ root: true })}>{t('sshw.root_btn')}</button>}
+            </div>
+            <div className="muted" style={{ fontSize: 12.5 }}>{t('sshw.root_why')}</div>
+          </div>
+        ))}
+        {pwOff && <div role="status" style={{ color: 'var(--ok)', marginTop: 6 }}>{t('sshw.locked')}</div>}
         {msg && <div className={msg.ok ? '' : 'error'} role={msg.ok ? 'status' : 'alert'} style={{ marginTop: 10, color: msg.ok ? 'var(--ok)' : undefined }}>{msg.text}</div>}
       </Card>
 
-      <Card title={t('ssh.steps')}>
-        {step(1, !!key, t('ssh.step1'), t('ssh.step1_help'))}
-        {step(2, deployed, t('ssh.step2'), data.canHarden ? t('ssh.step2_help') : t('ssh.step2_manual'))}
-        {step(3, tested, t('ssh.step3'), t('ssh.step3_help'))}
-        {step(4, data.hostKeys?.passwordAuth === 'no', t('ssh.step4'), <>{t('ssh.step4_help')} <button className="btn sm" onClick={onGoSecurity}>{t('ssh.go_security')}</button></>)}
-      </Card>
+      <details open={!acc.host}>
+        <summary className="muted" style={{ cursor: 'pointer', marginBottom: 10 }}>{t('sshw.advanced')}</summary>
+        <Card title={t('ssh.connection')}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 12, alignItems: 'end' }}>
+            <label className="field">{t('ssh.host')}<input value={f.host} onChange={(e) => setForm({ ...f, host: e.target.value })} placeholder="192.168.1.20" spellCheck={false} /></label>
+            <label className="field">{t('ssh.port')}<input type="number" min={1} max={65535} value={f.port} onChange={(e) => setForm({ ...f, port: e.target.value })} /></label>
+            <label className="field">{t('ssh.user')}<input value={f.user} onChange={(e) => setForm({ ...f, user: e.target.value })} spellCheck={false} /></label>
+          </div>
+          <label className="field">{t('ssh.key')}
+            <select value={f.keyId} onChange={(e) => setForm({ ...f, keyId: e.target.value })}>
+              <option value="">{t('ssh.no_key')}</option>
+              {(keys ?? []).map((k) => <option key={k.id} value={k.id}>{k.name} · {k.fingerprint.slice(0, 22)}…</option>)}
+            </select>
+          </label>
+          {acc.hostkey && <p className="muted mono" style={{ fontSize: 11.5, margin: '10px 0 0' }}>{t('ssh.pinned')}: {acc.hostkey} <button className="btn sm" style={{ marginLeft: 8 }} onClick={() => run('reset', async () => { await api(`/agents/${agentId}/ssh`, { method: 'PUT', body: { resetHostKey: true } }); })}>{t('ssh.forget')}</button></p>}
+          <div className="row" style={{ gap: 8, marginTop: 12 }}>
+            <button className="btn primary" disabled={!!busy || !form} onClick={save}>{t('common.save')}</button>
+          </div>
+        </Card>
+      </details>
 
       <Card title={t('ssh.authorized')} flush actions={data.canHarden && key && users.length > 0 ? (
         <div className="row" style={{ gap: 6 }}>

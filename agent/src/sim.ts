@@ -166,7 +166,7 @@ function simProvider(h: SimHost): Provider {
     },
     drainEvents: () => events.splice(0),
     async command(action, args) {
-      if (action === 'ssh.list') return { keys: hostKeys, users: ['root', 'deploy'], passwordAuth: 'yes' };
+      if (action === 'ssh.list') return { keys: hostKeys, users: ['root', 'deploy'], passwordAuth: 'yes', permitRootLogin: 'yes', managed: false };
       if (action === 'ssh.authorize') {
         hostKeys.push({ user: String(args.user), type: 'ssh-ed25519', fingerprint: 'SHA256:' + Buffer.from(String(args.key)).toString('base64').slice(8, 51).padEnd(43, 'x'), comment: String(args.key).split(' ')[2] ?? '' });
         return { steps: [`authorized the key for ${args.user}`] };
