@@ -2,6 +2,7 @@ import { collectMetrics, hostInfo } from './host.ts';
 import { containerAction, containerLogs, dockerAvailable, listContainers } from './docker.ts';
 import { SecurityScanner } from './security.ts';
 import { applyFix, isNativeRoot, previewFix } from './hardening.ts';
+import { authorizeKey, listHostKeys, revokeKey } from './sshkeys.ts';
 import { WindowsScanner, windowsInfo } from './windows.ts';
 import type { Provider } from './protocol.ts';
 
@@ -31,6 +32,7 @@ export async function createHostProvider(stateDir: string): Promise<Provider> {
     async command(action, args) {
       if (action === 'docker.logs') return containerLogs(String(args.id), Number(args.tail ?? 200));
       const ports = () => (scanner instanceof SecurityScanner ? scanner.exposedTcpPorts() : []);
+      if (action === 'ssh.list') return listHostKeys();
       if (action === 'harden.preview') return previewFix(String(args.fix), args.args ?? {}, ports);
       if (!allowActions) throw new Error('actions are disabled on this agent (OCULYX_ALLOW_ACTIONS=true to enable)');
       switch (action) {
@@ -38,6 +40,16 @@ export async function createHostProvider(stateDir: string): Promise<Provider> {
         case 'docker.stop':
         case 'docker.restart':
           return containerAction(action.slice(7) as 'start' | 'stop' | 'restart', String(args.id));
+        case 'ssh.authorize': {
+          const r = authorizeKey(String(args.user), String(args.key));
+          if (scanner instanceof SecurityScanner) scanner.acceptKeys();
+          return r;
+        }
+        case 'ssh.revoke': {
+          const r = revokeKey(String(args.user), String(args.fingerprint));
+          if (scanner instanceof SecurityScanner) scanner.acceptKeys();
+          return r;
+        }
         case 'harden.apply':
           return applyFix(String(args.fix), args.args ?? {}, ports);
         case 'fim.rebaseline':

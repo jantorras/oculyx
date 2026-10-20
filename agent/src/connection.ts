@@ -131,7 +131,7 @@ export class Connection {
         if (m.t !== 'cmd') return;
         try {
           this.send({ t: 'result', id: m.id, ok: true, data: await this.p.command(m.action, m.args ?? {}) });
-          if (m.action.startsWith('docker.') || m.action.startsWith('fim.') || m.action.startsWith('harden.')) setTimeout(() => this.refreshSoon(), 500);
+          if (m.action.startsWith('docker.') || m.action.startsWith('fim.') || m.action.startsWith('harden.') || m.action.startsWith('ssh.')) setTimeout(() => this.refreshSoon(), 500);
         } catch (e) {
           this.send({ t: 'result', id: m.id, ok: false, error: (e as Error).message });
         }

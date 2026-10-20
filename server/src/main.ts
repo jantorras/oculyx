@@ -10,6 +10,7 @@ import { Hub } from './hub.ts';
 import { notify } from './notify.ts';
 import { Tunnel, validTunnelToken, validHostname } from './tunnel.ts';
 import { RULES, ruleConfig } from './rules.ts';
+import { KeyVault, generateKey, importKey, connect, exec, shell, loadAccess, SshError } from './ssh.ts';
 import { agentBundle, renderInstallScript, safeServerUrl, stampExe } from './installer.ts';
 import { hashPassword, verifyPassword, loadSecret, signToken, verifyToken, randomToken, sha256, hasRole, LoginLimiter, type Role } from './auth.ts';
 
@@ -29,6 +30,7 @@ const alerts = new Alerts(db);
 const hub = new Hub(db, alerts);
 const limiter = new LoginLimiter();
 const tunnel = new Tunnel(db);
+const vault = new KeyVault(secret);
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, trustProxy: process.env.OCULYX_TRUST_PROXY === '1' ? true : ['127.0.0.1', '::1'], bodyLimit: 1_000_000 });
 
@@ -476,6 +478,148 @@ app.post('/api/settings/test-notify', admin, async () => {
   return { ok: true };
 });
 
+// ---------- SSH keys and access from the panel ----------
+const HOST_RE = /^[A-Za-z0-9.:_-]{1,253}$/;
+const SSH_USER_RE = /^[a-z_][a-z0-9_-]{0,31}$/;
+const keyPublic = (id: number) => db.get('SELECT id,name,public,fingerprint FROM ssh_keys WHERE id=?', id);
+
+app.get('/api/ssh/keys', admin, async () => db.all('SELECT id,name,public,fingerprint,created,created_by FROM ssh_keys ORDER BY created DESC'));
+app.post('/api/ssh/keys', admin, async (req, reply) => {
+  const b = (req.body ?? {}) as { name?: string; private?: string };
+  const name = String(b.name ?? '').trim().slice(0, 60);
+  if (!name) return reply.code(400).send({ error: 'bad_name' });
+  const comment = 'oculyx-' + name.replace(/[^A-Za-z0-9_.-]+/g, '-').slice(0, 40);
+  try {
+    const k = b.private ? importKey(String(b.private), comment) : generateKey(comment);
+    const r = db.run('INSERT INTO ssh_keys(name,public,fingerprint,private_enc,created,created_by) VALUES(?,?,?,?,?,?)', name, k.public, k.fingerprint, vault.seal(k.private), Date.now(), req.user!.username);
+    audit(req.user!.username, b.private ? 'ssh.key.import' : 'ssh.key.create', name, req.ip);
+    return { id: r.id, name, public: k.public, fingerprint: k.fingerprint };
+  } catch (e) {
+    return reply.code(400).send({ error: (e as Error).message === 'encrypted_key' ? 'encrypted_key' : 'bad_key' });
+  }
+});
+app.get('/api/ssh/keys/:id/private', admin, async (req, reply) => {
+  const k = db.get('SELECT name,private_enc FROM ssh_keys WHERE id=?', Number((req.params as any).id));
+  if (!k) return reply.code(404).send({ error: 'not_found' });
+  audit(req.user!.username, 'ssh.key.download', k.name, req.ip);
+  return reply.header('content-disposition', `attachment; filename="oculyx_${String(k.name).replace(/[^A-Za-z0-9_.-]+/g, '_')}"`).type('text/plain').send(vault.open(k.private_enc));
+});
+app.delete('/api/ssh/keys/:id', admin, async (req) => {
+  const id = Number((req.params as any).id);
+  db.run('UPDATE ssh_access SET key_id=NULL, tested=NULL WHERE key_id=?', id);
+  db.run('DELETE FROM ssh_keys WHERE id=?', id);
+  audit(req.user!.username, 'ssh.key.delete', id, req.ip);
+  return { ok: true };
+});
+
+app.get('/api/agents/:id/ssh', admin, async (req, reply) => {
+  const id = Number((req.params as any).id);
+  const access = loadAccess(db, id);
+  if (!access) return reply.code(404).send({ error: 'not_found' });
+  let hostKeys: unknown = null;
+  let hostKeysError = '';
+  try {
+    hostKeys = await hub.command(id, 'ssh.list');
+  } catch (e) {
+    hostKeysError = (e as Error).message;
+  }
+  const info = JSON.parse(db.get('SELECT info FROM agents WHERE id=?', id)?.info ?? '{}');
+  return { access, hostKeys, hostKeysError, canHarden: info.canHarden === true, online: hub.isOnline(id) };
+});
+
+app.put('/api/agents/:id/ssh', admin, async (req, reply) => {
+  const id = Number((req.params as any).id);
+  const cur = loadAccess(db, id);
+  if (!cur) return reply.code(404).send({ error: 'not_found' });
+  const b = (req.body ?? {}) as { host?: string; port?: number; user?: string; keyId?: number | null; resetHostKey?: boolean };
+  const host = b.host !== undefined ? String(b.host).trim() : cur.host;
+  const port = b.port !== undefined ? Number(b.port) : cur.port;
+  const user = b.user !== undefined ? String(b.user).trim() : cur.user;
+  const keyId = b.keyId !== undefined ? b.keyId : cur.key_id;
+  if (!HOST_RE.test(host)) return reply.code(400).send({ error: 'bad_host' });
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return reply.code(400).send({ error: 'bad_port' });
+  if (!SSH_USER_RE.test(user)) return reply.code(400).send({ error: 'bad_ssh_user' });
+  if (keyId != null && !keyPublic(Number(keyId))) return reply.code(400).send({ error: 'bad_key' });
+  const moved = host !== cur.host || port !== cur.port || b.resetHostKey === true;
+  const changedLogin = moved || user !== cur.user || keyId !== cur.key_id;
+  db.run(
+    `INSERT INTO ssh_access(agent_id,host,port,user,key_id,hostkey,tested) VALUES(?,?,?,?,?,?,?)
+     ON CONFLICT(agent_id) DO UPDATE SET host=excluded.host, port=excluded.port, user=excluded.user, key_id=excluded.key_id, hostkey=excluded.hostkey, tested=excluded.tested`,
+    id, host, port, user, keyId ?? null, moved ? null : cur.hostkey, changedLogin ? null : cur.tested,
+  );
+  audit(req.user!.username, 'ssh.access.update', id, req.ip);
+  return { ok: true };
+});
+
+app.post('/api/agents/:id/ssh/deploy', admin, async (req, reply) => {
+  const id = Number((req.params as any).id);
+  const { keyId, user } = (req.body ?? {}) as { keyId?: number; user?: string };
+  const k = keyPublic(Number(keyId));
+  if (!k) return reply.code(400).send({ error: 'bad_key' });
+  if (!SSH_USER_RE.test(String(user ?? ''))) return reply.code(400).send({ error: 'bad_ssh_user' });
+  try {
+    const out = await hub.command(id, 'ssh.authorize', { user, key: k.public }, 30_000);
+    audit(req.user!.username, 'ssh.key.deploy', `${id}:${user}:${k.fingerprint}`, req.ip);
+    return out;
+  } catch (e) {
+    return reply.code(502).send({ error: (e as Error).message });
+  }
+});
+app.post('/api/agents/:id/ssh/revoke', admin, async (req, reply) => {
+  const id = Number((req.params as any).id);
+  const { user, fingerprint } = (req.body ?? {}) as { user?: string; fingerprint?: string };
+  try {
+    const out = await hub.command(id, 'ssh.revoke', { user, fingerprint }, 30_000);
+    audit(req.user!.username, 'ssh.key.revoke', `${id}:${user}:${fingerprint}`, req.ip);
+    return out;
+  } catch (e) {
+    return reply.code(502).send({ error: (e as Error).message });
+  }
+});
+
+/** Opens a real SSH connection with the stored key; pins the host key on first use. */
+async function sshSession(agentId: number) {
+  const access = loadAccess(db, agentId);
+  if (!access || !access.key_id) throw new SshError('no_key', 'Choose an SSH key for this host first.');
+  const row = db.get('SELECT private_enc FROM ssh_keys WHERE id=?', access.key_id);
+  if (!row) throw new SshError('no_key', 'The selected SSH key no longer exists.');
+  if (!access.host) throw new SshError('unreachable', 'Set the address to connect to.');
+  const c = await connect(access, vault.open(row.private_enc));
+  if (c.firstUse) db.run('UPDATE ssh_access SET hostkey=? WHERE agent_id=?', c.hostkey, agentId);
+  return { ...c, access };
+}
+app.post('/api/agents/:id/ssh/test', admin, async (req, reply) => {
+  const id = Number((req.params as any).id);
+  if (!loadAccess(db, id)) return reply.code(404).send({ error: 'not_found' });
+  const cur = loadAccess(db, id)!;
+  db.run('INSERT OR IGNORE INTO ssh_access(agent_id,host,port,user) VALUES(?,?,?,?)', id, cur.host, cur.port, cur.user);
+  try {
+    const s = await sshSession(id);
+    const out = await exec(s.client, 'id -un; hostname');
+    s.client.end();
+    db.run('UPDATE ssh_access SET tested=? WHERE agent_id=?', Date.now(), id);
+    audit(req.user!.username, 'ssh.test', id, req.ip);
+    const [who, host] = out.split('\n');
+    return { ok: true, user: who, hostname: host, hostkey: s.hostkey, firstUse: s.firstUse };
+  } catch (e) {
+    return reply.code(502).send({ error: e instanceof SshError ? e.code : 'ssh_error', message: (e as Error).message });
+  }
+});
+
+// one-time tickets let the browser open the terminal websocket without putting the session token in a URL
+const tickets = new Map<string, { agentId: number; user: string; exp: number }>();
+const termCount = new Map<string, number>();
+app.post('/api/agents/:id/terminal-ticket', admin, async (req, reply) => {
+  const id = Number((req.params as any).id);
+  const a = loadAccess(db, id);
+  if (!a?.key_id) return reply.code(400).send({ error: 'no_key' });
+  if ((termCount.get(req.user!.username) ?? 0) >= 4) return reply.code(429).send({ error: 'too_many_sessions' });
+  const t = randomToken(24);
+  tickets.set(t, { agentId: id, user: req.user!.username, exp: Date.now() + 30_000 });
+  for (const [k, v] of tickets) if (v.exp < Date.now()) tickets.delete(k);
+  return { ticket: t };
+});
+
 // ---------- detection rules ----------
 app.get('/api/rules', admin, async () => ({
   rules: RULES.map((r) => ({ id: r.id, event: r.event, group: r.group, defaultSeverity: r.severity, defaultEnabled: r.enabled, ...ruleConfig(db, r) })),
@@ -604,7 +748,19 @@ if (existsSync(WEB_DIR)) {
 
 // ---------- agent websocket ----------
 const wss = new WebSocketServer({ noServer: true, maxPayload: 4 * 1024 * 1024 });
+const termWss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
 app.server.on('upgrade', (req, socket, head) => {
+  if (req.url?.startsWith('/ws/terminal')) {
+    const ticket = new URL(req.url, 'http://x').searchParams.get('ticket') ?? '';
+    const t = tickets.get(ticket);
+    tickets.delete(ticket);
+    const origin = req.headers.origin;
+    if (!t || t.exp < Date.now() || (origin && new URL(origin).host !== req.headers.host)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      return socket.destroy();
+    }
+    return termWss.handleUpgrade(req, socket, head, (ws) => void runTerminal(ws, t, String(req.socket.remoteAddress ?? '')));
+  }
   if (!req.url?.startsWith('/ws/agent')) return socket.destroy();
   const auth = String(req.headers.authorization ?? '');
   const [idStr, sec] = auth.startsWith('Bearer ') ? auth.slice(7).split('.') : [];
@@ -615,6 +771,78 @@ app.server.on('upgrade', (req, socket, head) => {
   }
   wss.handleUpgrade(req, socket, head, (ws) => hub.attach(agent.id, ws, String(req.socket.remoteAddress ?? '')));
 });
+
+// ---------- web terminal: browser <-> server <-> SSH ----------
+async function runTerminal(ws: import('ws').WebSocket, t: { agentId: number; user: string }, ip: string) {
+  const started = Date.now();
+  let bytes = 0;
+  const label = `${t.agentId}`;
+  termCount.set(t.user, (termCount.get(t.user) ?? 0) + 1);
+  const send = (o: unknown) => ws.readyState === ws.OPEN && ws.send(JSON.stringify(o));
+  let client: import('ssh2').Client | null = null;
+  let stream: import('ssh2').ClientChannel | null = null;
+  let idle: NodeJS.Timeout | null = null;
+  const bump = () => {
+    if (idle) clearTimeout(idle);
+    idle = setTimeout(() => {
+      send({ t: 'error', message: 'Closed after 30 minutes without input.' });
+      ws.close();
+    }, 30 * 60_000);
+  };
+  const done = () => {
+    if (idle) clearTimeout(idle);
+    stream?.close();
+    client?.end();
+    termCount.set(t.user, Math.max(0, (termCount.get(t.user) ?? 1) - 1));
+    audit(t.user, 'terminal.close', `${label} ${Math.round((Date.now() - started) / 1000)}s ${bytes}B`, ip);
+  };
+  ws.once('close', done);
+  ws.on('error', () => ws.close());
+  const first = new Promise<{ cols: number; rows: number }>((res) => {
+    const timer = setTimeout(() => res({ cols: 100, rows: 30 }), 3000);
+    ws.once('message', (raw) => {
+      clearTimeout(timer);
+      try {
+        const m = JSON.parse(raw.toString());
+        res({ cols: Math.min(500, Math.max(10, Number(m.cols) || 100)), rows: Math.min(200, Math.max(3, Number(m.rows) || 30)) });
+      } catch {
+        res({ cols: 100, rows: 30 });
+      }
+    });
+  });
+  try {
+    const { cols, rows } = await first;
+    const s = await sshSession(t.agentId);
+    client = s.client;
+    stream = await shell(s.client, cols, rows);
+    audit(t.user, 'terminal.open', `${label} ${s.access.user}@${s.access.host}`, ip);
+    send({ t: 'ready', user: s.access.user, host: s.access.host, firstUse: s.firstUse, hostkey: s.hostkey });
+    bump();
+    stream.on('data', (d: Buffer) => {
+      bytes += d.length;
+      if (ws.readyState === ws.OPEN) ws.send(d);
+    });
+    stream.stderr.on('data', (d: Buffer) => ws.readyState === ws.OPEN && ws.send(d));
+    stream.on('close', () => {
+      send({ t: 'exit' });
+      ws.close();
+    });
+    ws.on('message', (raw, isBinary) => {
+      bump();
+      if (isBinary) return void stream?.write(raw as Buffer);
+      try {
+        const m = JSON.parse(raw.toString());
+        if (m.t === 'in') stream?.write(String(m.d));
+        else if (m.t === 'resize') stream?.setWindow(Math.min(200, Math.max(3, Number(m.rows) || 30)), Math.min(500, Math.max(10, Number(m.cols) || 100)), 0, 0);
+      } catch {
+        /* ignore malformed frames */
+      }
+    });
+  } catch (e) {
+    send({ t: 'error', message: (e as Error).message, code: e instanceof SshError ? e.code : 'ssh_error' });
+    ws.close();
+  }
+}
 
 // ---------- housekeeping ----------
 setInterval(() => alerts.sweepOffline(), 15_000);

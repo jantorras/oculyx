@@ -52,9 +52,11 @@ const HOSTS: SimHost[] = [
       { checkId: 'docker:root:shop-api', severity: 'low', title: 'Container shop-api runs as root', detail: 'Set a non-root USER in the image or via --user.' },
       { checkId: 'docker:latest:redis-cache', severity: 'low', title: 'Container redis-cache uses an unpinned image tag', detail: 'redis:7 - pin a version or digest.' },
       { checkId: 'sys:updates', severity: 'low', title: '14 pending package updates', detail: 'Run: apt update && apt upgrade' },
+      { checkId: 'net:no-ids', severity: 'medium', title: 'No intrusion prevention (fail2ban / CrowdSec)', detail: 'Repeated failed logins are not blocked automatically. fail2ban bans offending addresses at the firewall.' },
+      { checkId: 'ssh:max-auth-tries', severity: 'low', title: 'SSH allows 6 authentication attempts per connection', detail: 'Lower MaxAuthTries to 3 to slow brute-force attempts.' },
     ],
     ports: [P(22), P(80), P(443), P(6379), P(3000, false), P(5432, false)],
-    eventKinds: ['ssh_failed', 'ssh_failed', 'ssh_login', 'sudo'],
+    eventKinds: ['ssh_failed', 'ssh_failed', 'ssh_login', 'sudo', 'sudo_suspicious', 'ssh_login_after_failures'],
   },
   {
     name: 'db-primary', os: 'Debian GNU/Linux 12 (bookworm)', kernel: '6.1.0-26-amd64', cpus: 16, cpuModel: 'Intel Xeon Silver 4314', memGb: 128, diskGb: 1800,
@@ -65,9 +67,12 @@ const HOSTS: SimHost[] = [
       { checkId: 'sys:sec-updates', severity: 'high', title: '6 pending security updates', detail: 'Run: apt update && apt upgrade' },
       { checkId: 'fw:inactive', severity: 'medium', title: 'No active host firewall detected', detail: 'Enable ufw or nftables.' },
       { checkId: 'fim:etc/ssh/sshd_config', severity: 'medium', title: 'File modified: /etc/ssh/sshd_config', detail: 'Differs from the recorded baseline. If the change was intentional, accept it as the new baseline.' },
+      { checkId: 'sys:auto-updates', severity: 'medium', title: 'Automatic security updates are not enabled', detail: 'Install and enable unattended-upgrades so known vulnerabilities are patched without waiting for you.' },
+      { checkId: 'sys:sysctl', severity: 'medium', title: '6 kernel network/security settings are not hardened', detail: 'net.ipv4.conf.all.rp_filter=1, net.ipv4.conf.all.accept_redirects=0, net.ipv4.tcp_syncookies=1, kernel.dmesg_restrict=1' },
+      { checkId: 'acct:su-open', severity: 'low', title: 'Any local user may try to su to root', detail: 'Restrict su to a dedicated group (pam_wheel).' },
     ],
     ports: [P(22), P(5432), P(9100)],
-    eventKinds: ['ssh_login', 'sudo', 'fim'],
+    eventKinds: ['ssh_login', 'sudo', 'fim', 'ssh_key_added', 'user_created'],
   },
   {
     name: 'edge-gateway', os: 'Ubuntu 22.04.5 LTS', kernel: '5.15.0-122-generic', cpus: 4, cpuModel: 'Intel Core i5-12400', memGb: 16, diskGb: 240,
@@ -83,9 +88,11 @@ const HOSTS: SimHost[] = [
       { checkId: 'docker:priv:wireguard', severity: 'high', title: 'Container wireguard runs privileged', detail: 'Drop --privileged and add only NET_ADMIN.' },
       { checkId: 'docker:hostnet:traefik', severity: 'medium', title: 'Container traefik uses host networking' },
       { checkId: 'docker:latest:portainer-legacy', severity: 'low', title: 'Container portainer-legacy uses an unpinned image tag' },
+      { checkId: 'ssh:password-auth', severity: 'medium', title: 'SSH password authentication enabled', detail: 'Passwords can be guessed; keys cannot. Deploy a key from the panel, test it, then turn passwords off.' },
+      { checkId: 'net:no-ids', severity: 'medium', title: 'No intrusion prevention (fail2ban / CrowdSec)', detail: 'Repeated failed logins are not blocked automatically.' },
     ],
     ports: [P(22), P(80), P(443), P(9000), P(51820)],
-    eventKinds: ['port_opened', 'ssh_login'],
+    eventKinds: ['port_opened', 'ssh_login', 'persistence_changed', 'reverse_shell'],
   },
 ];
 
@@ -95,7 +102,19 @@ function simProvider(h: SimHost): Provider {
   const events: AgentEvent[] = [];
   let spike = 0;
   const idOf = (i: number) => `${(0xa1b2c3d4e5f6 + i * 7919).toString(16).padStart(12, '0')}${'0'.repeat(52)}`;
-  const info: HostInfo = { hostname: h.name, os: h.os, kernel: h.kernel, arch: 'x86_64', cpus: h.cpus, cpuModel: h.cpuModel, memTotal: h.memGb * GB, docker: h.containers.length > 0, agentVersion: '0.1.0-sim' };
+  const info: HostInfo = { hostname: h.name, os: h.os, kernel: h.kernel, arch: 'x86_64', cpus: h.cpus, cpuModel: h.cpuModel, memTotal: h.memGb * GB, docker: h.containers.length > 0, agentVersion: '0.1.0-sim', actions: true, canHarden: true };
+  const hostKeys = [{ user: 'root', type: 'ssh-ed25519', fingerprint: 'SHA256:Jq1x0kq0m7ZkQpV8Pq3dYkq0s2mWf9v8nE1l0aVbZ4o', comment: 'maria@laptop' }, { user: 'deploy', type: 'ssh-ed25519', fingerprint: 'SHA256:wP9l0cH2dTq1uYz7nB3vXrK5sA8eM4jG6fD2oLhQ1iU', comment: 'ci-deploy' }];
+  const FIX_MAP: Record<string, string> = { 'ssh:password-auth': 'ssh.password-auth', 'ssh:root-login': 'ssh.root-login', 'fw:inactive': 'firewall.enable', 'sys:sysctl': 'sysctl.apply', 'net:no-ids': 'fail2ban.install', 'ssh:max-auth-tries': 'ssh.max-auth-tries', 'acct:su-open': 'su.restrict', 'sys:auto-updates': 'autoupdates.enable' };
+  const PREVIEW: Record<string, { title: string; steps: string[]; warning?: string; confirm?: boolean }> = {
+    'ssh.password-auth': { title: 'Turn off SSH password logins', steps: ['PasswordAuthentication no', 'KbdInteractiveAuthentication no', 'Accounts with a key: root (1), deploy (1)'], warning: 'Only key-based logins will work afterwards. Make sure you tested a key login first.', confirm: true },
+    'ssh.root-login': { title: 'Allow root SSH login only with keys', steps: ['PermitRootLogin prohibit-password'], warning: 'Root will no longer be able to log in with a password.' },
+    'firewall.enable': { title: 'Enable the firewall (default deny)', steps: ['Default policy: deny incoming, allow outgoing', 'Allow 22/tcp (currently listening)', 'Allow 5432/tcp (currently listening)', 'Enable ufw'], warning: 'Only the ports listed above stay reachable.', confirm: true },
+    'sysctl.apply': { title: 'Apply kernel hardening settings', steps: ['net.ipv4.conf.all.rp_filter = 1', 'net.ipv4.tcp_syncookies = 1', 'kernel.dmesg_restrict = 1'] },
+    'fail2ban.install': { title: 'Install fail2ban', steps: ['apt-get install fail2ban', 'Enable the sshd jail: 5 failures in 10 minutes bans the address for 1 hour'] },
+    'ssh.max-auth-tries': { title: 'Limit SSH authentication attempts', steps: ['MaxAuthTries 3'] },
+    'su.restrict': { title: 'Restrict su to a dedicated group', steps: ['Create the group "sugroup"', 'Require membership of sugroup to use su'] },
+    'autoupdates.enable': { title: 'Enable automatic security updates', steps: ['apt-get install unattended-upgrades', 'Enable the daily timers'] },
+  };
 
   const eventFor = (kind: string): AgentEvent => {
     const ip = `${Math.floor(rnd(2, 223))}.${Math.floor(rnd(0, 255))}.${Math.floor(rnd(0, 255))}.${Math.floor(rnd(1, 254))}`;
@@ -104,6 +123,12 @@ function simProvider(h: SimHost): Provider {
       case 'ssh_login': return { type: 'ssh_login', severity: 'info', message: `SSH login: deploy from 10.0.0.${Math.floor(rnd(2, 40))} (publickey)`, data: {} };
       case 'sudo': return { type: 'sudo', severity: 'info', message: 'sudo by deploy: /usr/bin/systemctl restart nginx', data: {} };
       case 'port_opened': return { type: 'port_opened', severity: 'medium', message: `New listening port tcp/${Math.floor(rnd(3000, 9000))}`, data: {} };
+      case 'sudo_suspicious': return { type: 'sudo_suspicious', severity: 'high', message: 'Suspicious sudo by deploy (setting the SUID/SGID bit): /usr/bin/chmod u+s /tmp/.x', data: { user: 'deploy' } };
+      case 'ssh_login_after_failures': return { type: 'ssh_login_after_failures', severity: 'critical', message: `admin logged in from ${ip} right after 9 failed attempts from the same address: the password may have been guessed`, data: { user: 'admin', ip } };
+      case 'ssh_key_added': return { type: 'ssh_key_added', severity: 'high', message: 'New SSH key authorized for root: SHA256:Jq1x0kq0m7ZkQpV8Pq3dYkq0s2mWf9v8nE1l0aVbZ4o (backup@laptop)', data: { user: 'root' } };
+      case 'user_created': return { type: 'user_created', severity: 'high', message: 'New local account: support2 (uid 1004, shell /bin/bash)', data: { user: 'support2' } };
+      case 'persistence_changed': return { type: 'persistence_changed', severity: 'high', message: '/etc/cron.d/sysupdate created', data: { file: 'etc/cron.d/sysupdate' } };
+      case 'reverse_shell': return { type: 'reverse_shell', severity: 'critical', message: 'A shell (pid 48213) has its input and output wired to a network socket: likely a reverse shell', data: { pid: 48213 } };
       default: return { type: 'fim', severity: 'medium', message: '/etc/ssh/sshd_config modified', data: {} };
     }
   };
@@ -137,10 +162,32 @@ function simProvider(h: SimHost): Provider {
     },
     async security() {
       if (Math.random() < 0.5) events.push(eventFor(h.eventKinds[Math.floor(Math.random() * h.eventKinds.length)]));
-      return { findings: h.findings, ports: h.ports };
+      return { findings: h.findings.map((f) => ({ ...f, fix: FIX_MAP[f.checkId] })), ports: h.ports };
     },
     drainEvents: () => events.splice(0),
     async command(action, args) {
+      if (action === 'ssh.list') return { keys: hostKeys, users: ['root', 'deploy'], passwordAuth: 'yes' };
+      if (action === 'ssh.authorize') {
+        hostKeys.push({ user: String(args.user), type: 'ssh-ed25519', fingerprint: 'SHA256:' + Buffer.from(String(args.key)).toString('base64').slice(8, 51).padEnd(43, 'x'), comment: String(args.key).split(' ')[2] ?? '' });
+        return { steps: [`authorized the key for ${args.user}`] };
+      }
+      if (action === 'ssh.revoke') {
+        const i = hostKeys.findIndex((k) => k.user === args.user && k.fingerprint === args.fingerprint);
+        if (i >= 0) hostKeys.splice(i, 1);
+        return { steps: [`removed the key from ${args.user}`] };
+      }
+      if (action === 'harden.preview') {
+        const p = PREVIEW[String(args.fix)];
+        if (!p) throw new Error('unknown fix');
+        return p;
+      }
+      if (action === 'harden.apply') {
+        const p = PREVIEW[String(args.fix)];
+        if (!p) throw new Error('unknown fix');
+        if (p.confirm && args.args?.confirm !== true) throw new Error('Confirmation required: tick the box saying you tested a key login.');
+        for (let i = h.findings.length - 1; i >= 0; i--) if (FIX_MAP[h.findings[i].checkId] === args.fix) h.findings.splice(i, 1);
+        return { steps: p.steps };
+      }
       if (action === 'docker.logs') {
         const now = Date.now();
         return Array.from({ length: 40 }, (_, i) => `${new Date(now - (40 - i) * 4000).toISOString()} ${['GET /healthz 200 1ms', 'GET /api/orders 200 23ms', 'POST /api/cart 201 41ms', 'worker: processed job ' + Math.floor(rnd(1000, 9999)), 'cache hit ratio 0.' + Math.floor(rnd(80, 99))][i % 5]}`).join('\n');

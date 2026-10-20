@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, usePoll, clock, ago } from '../lib';
+import { api, usePoll, clock, ago, getToken } from '../lib';
 import { useT } from '../i18n';
 import { useUser } from '../App';
 import { Card, Empty } from '../components/ui';
@@ -9,7 +9,7 @@ export function Settings({ tab: tabParam }: { tab?: string }) {
   const t = useT();
   const user = useUser();
   const isAdmin = user.role === 'admin';
-  const tabs = isAdmin ? ['enroll', 'users', 'notify', 'detect', 'domain', 'audit', 'account'] : ['account'];
+  const tabs = isAdmin ? ['enroll', 'users', 'notify', 'detect', 'sshkeys', 'domain', 'audit', 'account'] : ['account'];
   const tab = tabs.includes(tabParam ?? '') ? tabParam! : tabs[0];
   return (
     <>
@@ -21,6 +21,7 @@ export function Settings({ tab: tabParam }: { tab?: string }) {
       {tab === 'users' && <Users />}
       {tab === 'notify' && <Notify />}
       {tab === 'detect' && <Detect />}
+      {tab === 'sshkeys' && <SshKeys />}
       {tab === 'domain' && <Domain />}
       {tab === 'audit' && <Audit />}
       {tab === 'account' && <Account />}
@@ -124,6 +125,85 @@ function Notify() {
         <button className="btn" onClick={() => api('/settings/test-notify', { method: 'POST', body: {} })}>{t('notify.test')}</button>
         <span className="muted">{msg}</span>
       </div>
+    </div>
+  );
+}
+
+function SshKeys() {
+  const t = useT();
+  const { data, refresh } = usePoll(() => api<any[]>('/ssh/keys'), 10000);
+  const [name, setName] = useState('');
+  const [priv, setPriv] = useState('');
+  const [err, setErr] = useState('');
+  const [fresh, setFresh] = useState<any>(null);
+  const create = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr('');
+    try {
+      const k = await api('/ssh/keys', { body: { name, ...(priv.trim() ? { private: priv } : {}) } });
+      setFresh(k);
+      setName('');
+      setPriv('');
+      refresh();
+    } catch (x) {
+      setErr(t(`err.${(x as Error).message}`));
+    }
+  };
+  const download = async (k: any) => {
+    const res = await fetch(`/api/ssh/keys/${k.id}/private`, { headers: { authorization: `Bearer ${getToken() ?? ''}` } });
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `oculyx_${k.name.replace(/[^A-Za-z0-9_.-]+/g, '_')}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  };
+  return (
+    <div className="grid" style={{ maxWidth: 880 }}>
+      <Card title={t('sshkeys.new')}>
+        <p className="muted" style={{ marginTop: 0 }}>{t('sshkeys.intro')}</p>
+        <form className="grid" onSubmit={create}>
+          <label className="field">{t('sshkeys.name')}<input value={name} onChange={(e) => setName(e.target.value)} placeholder="admin-laptop" required maxLength={60} /></label>
+          <details>
+            <summary className="muted" style={{ cursor: 'pointer', fontSize: 13 }}>{t('sshkeys.import')}</summary>
+            <label className="field" style={{ marginTop: 8 }}>{t('sshkeys.import_help')}
+              <textarea className="mono" rows={5} value={priv} onChange={(e) => setPriv(e.target.value)} placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" spellCheck={false} autoComplete="off" />
+            </label>
+          </details>
+          {err && <div className="error" role="alert">{err}</div>}
+          <div><button className="btn primary">{priv.trim() ? t('sshkeys.import_btn') : t('sshkeys.generate')}</button></div>
+        </form>
+        {fresh && (
+          <div className="warn" style={{ marginTop: 12 }}>
+            <b>{t('sshkeys.created', { name: fresh.name })}</b>
+            <pre className="mono" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12, margin: '8px 0 0' }}>{fresh.public}</pre>
+          </div>
+        )}
+      </Card>
+      <Card flush>
+        {!data || data.length === 0 ? <Empty>{t('sshkeys.none')}</Empty> : (
+          <div className="table-wrap"><table>
+            <thead><tr><th>{t('sshkeys.name')}</th><th>{t('ssh.fingerprint')}</th><th>{t('sshkeys.created_col')}</th><th /></tr></thead>
+            <tbody>{data.map((k) => (
+              <tr key={k.id}>
+                <td style={{ fontWeight: 600 }}>{k.name}</td>
+                <td className="mono muted" style={{ fontSize: 12 }}>{k.fingerprint}</td>
+                <td className="muted">{clock(k.created)}{k.created_by ? ` · ${k.created_by}` : ''}</td>
+                <td className="r">
+                  <div className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
+                    <button className="btn sm" onClick={() => navigator.clipboard?.writeText(k.public)}>{t('sshkeys.copy_pub')}</button>
+                    <button className="btn sm" onClick={() => download(k)}>{t('sshkeys.download')}</button>
+                    <button className="btn sm danger" onClick={async () => { if (confirm(t('sshkeys.confirm_delete', { name: k.name }))) { await api(`/ssh/keys/${k.id}`, { method: 'DELETE' }); refresh(); } }}>{t('common.delete')}</button>
+                  </div>
+                </td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        )}
+      </Card>
+      <p className="muted" style={{ fontSize: 12.5 }}>{t('sshkeys.security_note')}</p>
     </div>
   );
 }

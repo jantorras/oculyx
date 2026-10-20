@@ -6,6 +6,7 @@ import { Card, Empty, Score, SevPill, Skeleton, StatusDot } from '../components/
 import { Chart, Gauge } from '../components/Chart';
 import { ContainerTable } from './Containers';
 import { FindingList } from './Security';
+import { SshAccess } from './SshAccess';
 
 const RANGES = ['1h', '6h', '24h', '7d'];
 
@@ -25,6 +26,7 @@ export function HostDetail({ id, tab: tabParam }: { id: number; tab?: string }) 
     ['containers', `${t('nav.containers')}${a.docker ? ` (${a.docker.total})` : ''}`],
     ['security', `${t('nav.security')} (${a.findings.length})`],
     ['events', t('nav.events')],
+    ...(user.role === 'admin' ? ([['ssh', 'SSH']] as [string, string][]) : []),
   ];
 
   async function remove() {
@@ -122,6 +124,8 @@ export function HostDetail({ id, tab: tabParam }: { id: number; tab?: string }) 
           <FindingList rows={a.findings} onChange={refresh} />
         </Card>
       )}
+
+      {tab === 'ssh' && user.role === 'admin' && <SshAccess agentId={a.id} name={a.name} onGoSecurity={() => (location.hash = `/hosts/${a.id}/security`)} />}
 
       {tab === 'events' && (
         <Card flush>

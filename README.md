@@ -27,7 +27,9 @@
 
 - **Monitoring** — CPU, memory, disk, network and load per host, with history up to 7 days, threshold and offline alerts, webhook / Telegram notifications.
 - **Docker** — container inventory with live CPU/memory, logs, and start / stop / restart (opt-in per host).
-- **Security** — SSH and account hardening checks, exposed risky ports and port-change events, file integrity monitoring, SSH brute-force detection, sudo / login events, pending security updates, Docker posture (privileged, `docker.sock`, host network, root user, unpinned tags) and a security score per host.
+- **Security** — checks for SSH and account hardening, exposed risky ports, file integrity, pending security updates, Docker posture (privileged, `docker.sock`, host network, root user, unpinned tags) and a security score per host. Each hardening finding can be **fixed from the panel** (see below).
+- **Intrusion detection** — who signs in and from where (new address, root, off-hours, login right after a brute-force burst), suspicious `sudo` commands, new accounts, privileged-group and SSH-key changes, new cron/systemd/PAM persistence, new SUID files, reverse shells, processes running from `/tmp`, crypto-miners, unknown kernel modules. Every rule can be switched off or re-rated under *Settings → Detection*.
+- **SSH from the panel** — create or import SSH keys, put them on a host, test the login and open a **terminal in the browser**. Private keys are encrypted at rest, host keys are pinned, every session is audited.
 - **Windows agent** — metrics, Docker Desktop, and Windows-specific checks: Defender and firewall state, SMBv1, RDP without NLA, exposed RDP/SMB/WinRM/SQL ports, failed and RDP logons from the Security event log (brute-force detection), local Administrators changes, `hosts` file integrity, pending reboot, stale updates, accounts without password.
 - **Teams** — admin / operator / viewer roles, audit log, login rate limiting. UI in Catalan, Spanish and English, dark and light.
 - **Easy to add servers** — one command per host, with a live "waiting for connection" wizard in the UI.
@@ -120,6 +122,21 @@ No port forwarding, no reverse proxy, HTTPS included, configured from the web UI
 
 The server runs `cloudflared` itself and shows the tunnel status. Generated agent install commands switch to the new domain automatically.
 
+## Harden servers and detect intruders
+
+<p align="center">
+  <img src="docs/screenshots/fix.png" alt="One-click hardening fix with a preview" width="440">
+  <img src="docs/screenshots/ssh.png" alt="SSH keys and terminal per host" width="440">
+</p>
+
+**One-click fixes.** Findings marked *Apply fix* show exactly what will change, ask for confirmation when it could lock you out, and apply it on the host: SSH settings (`MaxAuthTries`, root login, passwords, modern algorithms, idle timeouts), `ufw` with default deny and your listening ports allowed, `fail2ban`, automatic security updates, kernel `sysctl` hardening, `su` restricted to a group, `hidepid` on `/proc`, file permissions. SSH changes are validated with `sshd -t`, checked with `sshd -T` and rolled back automatically if anything is off; "Undo SSH changes" removes them. Inspired by [How To Secure A Linux Server](https://github.com/imthenachoman/How-To-Secure-A-Linux-Server) (CC BY-SA 4.0).
+
+> Fixes need an agent installed in **native mode with `--allow-actions`** (it runs as root). Docker-mode agents mount the host read-only and can only report. The agent never runs arbitrary commands from the server: every fix is a named, parameter-checked operation.
+
+**Lock SSH down in four steps** (host → *SSH* tab): create a key under *Settings → SSH keys*, deploy it to an account, press *Test connection* (the panel logs in with the key only), then turn passwords off from the Security tab. The panel refuses to disable passwords if no account has a key.
+
+**Detection** works from the auth log or the journal (Debian 12 has no `auth.log`), `/proc`, and file baselines kept by the agent. Keys you deploy from the panel are not reported as intruders; keys added behind its back are. The first 24 hours of logins only teach the panel what is normal.
+
 ## Add servers to monitor
 
 In the web UI click **Add server**, name it, and paste the command on the host:
@@ -204,7 +221,7 @@ The demo runs the real server with simulated hosts that speak the real agent pro
 
 ## Status and roadmap
 
-Early (v0.x). Not done yet: 2FA, CVE scanning for packages and images, CIS benchmark audit, active response (blocking IPs), container terminal, PostgreSQL backend for very large fleets, tests beyond the end-to-end install check in CI.
+Early (v0.x). Not done yet: 2FA, CVE scanning for packages and images, a full CIS benchmark audit, Lynis/AIDE integration, automatic IP blocking, container terminal, PostgreSQL backend for very large fleets, tests beyond the end-to-end install check in CI.
 
 ## License
 

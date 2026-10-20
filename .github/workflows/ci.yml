@@ -83,7 +83,7 @@ jobs:
           done
 
       - name: Install a native agent
-        run: curl -fsSL http://localhost:8080/install.sh | sudo bash -s -- --token "$ENROLL_NATIVE" --name ci-native --native
+        run: curl -fsSL http://localhost:8080/install.sh | sudo bash -s -- --token "$ENROLL_NATIVE" --name ci-native --native --allow-actions
 
       - name: Install a Docker agent
         run: curl -fsSL http://localhost:8080/install.sh | sudo bash -s -- --token "$ENROLL_DOCKER" --name ci-docker
@@ -115,6 +115,10 @@ jobs:
           done
           echo "$DD" | jq '{containers: [.containers[]?.name]}'
           test "$(echo "$DD" | jq '(.containers // []) | length')" -gt 0
+
+      - name: 'Security: hardening fixes, SSH keys from the panel, web terminal, intrusion detection'
+        timeout-minutes: 12
+        run: bash scripts/ci/e2e-security.sh
 
       - name: Upgrade keeps the data and signs in with the same password
         run: |
