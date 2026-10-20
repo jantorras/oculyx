@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -24,6 +25,13 @@ export function renderInstallScript(template: string, serverUrl: string): string
 }
 
 /** Files an agent needs, served without auth so a fresh machine can fetch them with plain curl. */
+/** Same fingerprint the agent computes over its own source files (agent/src/host.ts BUILD). */
+export function bundleBuild(bundle: Map<string, string | Buffer>): string {
+  const h = createHash('sha1');
+  for (const k of [...bundle.keys()].filter((x) => x.startsWith('src/')).sort((a, b) => a.slice(4).localeCompare(b.slice(4)))) h.update(k.slice(4)).update('\0').update(bundle.get(k)!).update('\0');
+  return h.digest('hex').slice(0, 12);
+}
+
 export function agentBundle(agentDir: string): Map<string, string | Buffer> {
   const files = new Map<string, string | Buffer>();
   files.set('Dockerfile', AGENT_DOCKERFILE);

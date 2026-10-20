@@ -454,4 +454,13 @@ export const en: Record<string, string> = {
   'adm.confirm_reboot': 'Reboot this server in one minute?',
   'adm.confirm_force': 'Block it anyway?',
   'adm.search': 'Search services',
+  'servers.outdated': 'update available',
+  'servers.update': 'Update agent',
+  'servers.update_all': 'Update agents ({n})',
+  'servers.update_started': 'Update started on {n} agent(s); they restart and reconnect in about a minute.',
+  'servers.outdated_hint': '{n} agent(s) run an older version than this server offers. Update them to get the latest features.',
+  'servers.manual_title': 'Update {name}',
+  'servers.manual_help': 'This agent cannot update itself from the panel (it is Docker, read-only or too old). Run this on the host; it keeps the agent identity.',
+  'servers.manual_help_old': 'This agent is too old to update itself. Run this on the host once; afterwards updates can be done from the panel. Docker agents: remove "--native". Add "--allow-actions" if you want to manage the server from the panel.',
+  'servers.copy': 'Copy',
 };

@@ -454,4 +454,13 @@ export const es: Record<string, string> = {
   'adm.confirm_reboot': '¿Reiniciar este servidor en un minuto?',
   'adm.confirm_force': '¿Bloquearla igualmente?',
   'adm.search': 'Buscar servicios',
+  'servers.outdated': 'actualización disponible',
+  'servers.update': 'Actualizar agente',
+  'servers.update_all': 'Actualizar agentes ({n})',
+  'servers.update_started': 'Actualización iniciada en {n} agente(s); se reinician y reconectan en cerca de un minuto.',
+  'servers.outdated_hint': '{n} agente(s) tienen una versión anterior a la que ofrece este servidor. Actualízalos para tener las últimas funciones.',
+  'servers.manual_title': 'Actualizar {name}',
+  'servers.manual_help': 'Este agente no puede actualizarse desde el panel (es Docker, de solo lectura o demasiado antiguo). Ejecuta esto en el host; conserva la identidad del agente.',
+  'servers.manual_help_old': 'Este agente es demasiado antiguo para actualizarse solo. Ejecuta esto una vez en el host; después podrás actualizar desde el panel. Agentes Docker: quita "--native". Añade "--allow-actions" si quieres gestionar el servidor desde el panel.',
+  'servers.copy': 'Copiar',
 };

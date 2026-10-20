@@ -103,6 +103,22 @@ export function adminOverview() {
   };
 }
 
+// ------------------------------------------------------------------ self update
+/**
+ * Re-runs the installer from the server this agent reports to, as a separate systemd unit so it survives the
+ * agent's own restart. The installer keeps the agent's identity (credentials live in the state directory).
+ */
+export function selfUpdate(): { steps: string[] } {
+  if (!isNativeRoot) throw new Error('Only the native agent can update itself. Re-run the install command on this host.');
+  const server = String(process.env.OCULYX_SERVER ?? '').replace(/\/+$/, '');
+  const name = String(process.env.OCULYX_NAME ?? '');
+  if (!/^https?:\/\/[A-Za-z0-9.:\[\]-]+(\/[\w./-]*)?$/.test(server)) throw new Error('The agent does not know its server address.');
+  if (name && !/^[\w .@()-]{1,64}$/.test(name)) throw new Error('Unexpected agent name.');
+  sh('systemd-run', ['--collect', '--quiet', '--unit', `oculyx-agent-update-${Date.now()}`, '--', '/bin/bash', '-c',
+    'curl -fsSL --max-time 30 "$1/install.sh" | bash -s -- --native --allow-actions --server "$1" ${2:+--name "$2"}', '_', server, name]);
+  return { steps: ['Update started: the agent downloads the new version and restarts in about a minute.'] };
+}
+
 // ------------------------------------------------------------------ guards
 const sshPorts = (): number[] => {
   const p = (quiet('sshd', ['-T']) ?? '').split('\n').filter((l) => l.startsWith('port ')).map((l) => Number(l.slice(5)));

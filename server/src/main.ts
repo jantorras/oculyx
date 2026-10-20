@@ -11,7 +11,7 @@ import { notify } from './notify.ts';
 import { Tunnel, validTunnelToken, validHostname } from './tunnel.ts';
 import { RULES, ruleConfig } from './rules.ts';
 import { KeyVault, generateKey, importKey, connect, exec, shell, loadAccess, SshError } from './ssh.ts';
-import { agentBundle, renderInstallScript, safeServerUrl, stampExe } from './installer.ts';
+import { bundleBuild, agentBundle, renderInstallScript, safeServerUrl, stampExe } from './installer.ts';
 import { hashPassword, verifyPassword, loadSecret, signToken, verifyToken, randomToken, sha256, hasRole, LoginLimiter, type Role } from './auth.ts';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -80,6 +80,7 @@ const parse = (s: string | null | undefined) => {
   }
 };
 
+let BUILD = '';
 function agentView(a: any, full = false) {
   const online = Date.now() - a.last_seen < OFFLINE_AFTER_MS;
   const containers = parse(a.docker) as any[] | null;
@@ -91,6 +92,7 @@ function agentView(a: any, full = false) {
     lastSeen: a.last_seen,
     firstSeen: a.first_seen,
     info: parse(a.info),
+    outdated: (() => { const i = parse(a.info); return !!i && !String(i.agentVersion).includes('sim') && !!BUILD && i.build !== BUILD; })(),
     metrics: parse(a.last_metrics),
     score: score(a.id),
     docker: containers ? { total: containers.length, running: containers.filter((c) => c.state === 'running').length } : null,
@@ -364,6 +366,24 @@ app.post('/api/agents/:id/admin', admin, async (req, reply) => {
     audit(req.user!.username, 'admin.failed', `${id}:${op}`, req.ip);
     return reply.code(502).send({ error: (e as Error).message });
   }
+});
+
+/** Asks native agents that allow actions to fetch the current agent from this server and restart themselves. */
+app.post('/api/agents/update', admin, async (req, reply) => {
+  const ids = ((req.body ?? {}) as { ids?: unknown }).ids;
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 200) return reply.code(400).send({ error: 'bad_request' });
+  const results: { id: number; ok: boolean; error?: string }[] = [];
+  for (const raw of ids) {
+    const id = Number(raw);
+    try {
+      await hub.command(id, 'agent.update', {}, 30_000);
+      audit(req.user!.username, 'agent.update', String(id), req.ip);
+      results.push({ id, ok: true });
+    } catch (e) {
+      results.push({ id, ok: false, error: (e as Error).message });
+    }
+  }
+  return { results };
 });
 
 app.get('/api/alerts', viewer, async (req) => {
@@ -820,6 +840,7 @@ app.get('/healthz', async () => ({ ok: true }));
 const installTemplate = readFileSync(join(here, 'install.sh'), 'utf8');
 const installTemplatePs = readFileSync(join(here, 'install.ps1'), 'utf8');
 const bundle = agentBundle(AGENT_DIR);
+BUILD = bundleBuild(bundle);
 const originOf = (req: any) => {
   const proto = String(req.headers['x-forwarded-proto'] ?? req.protocol).split(',')[0].trim();
   const host = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? '').split(',')[0].trim();

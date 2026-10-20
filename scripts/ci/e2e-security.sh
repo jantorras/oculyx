@@ -120,6 +120,12 @@ sudo useradd -m -s /bin/bash ocxtest
 [ "$(adm svc.restart '{"unit":"cron.service"}')" = 200 ] && ok "service restart works" || die "admin check failed"
 [ "$(adm ip.block '{"ip":"not-an-ip"}')" != 200 ] && ok "invalid IP rejected" || die "admin check failed"
 [ "$(adm ip.block '{"ip":"127.0.0.1"}')" != 200 ] && ok "blocking the server itself is refused" || die "admin check failed"
+echo "== agent update from the panel"
+get "/agents/$ID" | jq -e '.outdated == false' >/dev/null && ok "agent build matches the server (not flagged outdated)" || die "agent flagged outdated right after install"
+post "/agents/update" "{\"ids\":[$ID]}" | jq -e '.results[0].ok == true' >/dev/null && ok "update command accepted"
+sleep 25
+for _ in $(seq 1 40); do get "/agents/$ID" | jq -e '.online == true' >/dev/null 2>&1 && break; sleep 3; done
+get "/agents/$ID" | jq -e '.online == true and .outdated == false' >/dev/null && ok "agent came back after updating itself" || die "agent did not come back after the update"
 post "/agents/$ID/fix" '{"fix":"ssh.revert"}' >/dev/null && ok "ssh.revert"
 test ! -e /etc/ssh/sshd_config.d/00-oculyx.conf && ok "drop-in removed"
 sudo userdel -r ocx-intruder 2>/dev/null || true

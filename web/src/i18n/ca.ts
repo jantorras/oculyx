@@ -454,4 +454,13 @@ export const ca: Record<string, string> = {
   'adm.confirm_reboot': 'Reiniciar aquest servidor d’aquí a un minut?',
   'adm.confirm_force': 'Bloquejar-la igualment?',
   'adm.search': 'Cerca serveis',
+  'servers.outdated': 'actualització disponible',
+  'servers.update': 'Actualitza l’agent',
+  'servers.update_all': 'Actualitza agents ({n})',
+  'servers.update_started': 'Actualització iniciada a {n} agent(s); es reinicien i es reconnecten en aproximadament un minut.',
+  'servers.outdated_hint': '{n} agent(s) tenen una versió anterior a la que ofereix aquest servidor. Actualitza’ls per tenir les últimes funcions.',
+  'servers.manual_title': 'Actualitza {name}',
+  'servers.manual_help': 'Aquest agent no es pot actualitzar des del panell (és Docker, de només lectura o massa antic). Executa això al host; conserva la identitat de l’agent.',
+  'servers.manual_help_old': 'Aquest agent és massa antic per actualitzar-se sol. Executa això una vegada al host; després podràs actualitzar des del panell. Agents Docker: treu “--native”. Afegeix “--allow-actions” si vols gestionar el servidor des del panell.',
+  'servers.copy': 'Copia',
 };

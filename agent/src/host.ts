@@ -1,10 +1,21 @@
-import { readFileSync, statfsSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, statfsSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { cpus, hostname, totalmem, freemem, arch, release, platform, uptime, loadavg } from 'node:os';
 import { join } from 'node:path';
 import type { HostInfo, MetricsSample } from './protocol.ts';
 import { netstatBytes } from './windows.ts';
 
 export const VERSION = '0.1.0';
+/** Fingerprint of this agent's source files; the server computes the same over what it would hand out, to spot outdated agents. */
+export const BUILD: string = (() => {
+  try {
+    const h = createHash('sha1');
+    for (const f of readdirSync(import.meta.dirname).filter((x) => x.endsWith('.ts') && x !== 'sim.ts').sort()) h.update(f).update('\0').update(readFileSync(join(import.meta.dirname, f))).update('\0');
+    return h.digest('hex').slice(0, 12);
+  } catch {
+    return '';
+  }
+})();
 /** Prefix under which the host's filesystem is mounted when the agent runs in a container (e.g. /host). */
 export const HOST_ROOT = process.env.HOST_ROOT ?? '';
 export const hp = (p: string) => join(HOST_ROOT || '/', p);
@@ -35,6 +46,7 @@ export function hostInfo(dockerAvailable: boolean): HostInfo {
     memTotal: totalmem(),
     docker: dockerAvailable,
     agentVersion: VERSION,
+    build: BUILD,
     platform: platform(),
   };
 }

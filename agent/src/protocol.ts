@@ -8,6 +8,10 @@ export interface HostInfo {
   memTotal: number;
   docker: boolean;
   agentVersion: string;
+  /** fingerprint of the agent's source files (see host.ts) */
+  build?: string;
+  /** how the agent runs: native (systemd), docker (container with the host mounted) or windows */
+  mode?: 'native' | 'docker' | 'windows';
   platform?: string;
   /** actions enabled on this agent */
   actions?: boolean;

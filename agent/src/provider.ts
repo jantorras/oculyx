@@ -1,5 +1,5 @@
-import { adminOverview, applyAdmin } from './admin.ts';
-import { collectMetrics, hostInfo } from './host.ts';
+import { adminOverview, applyAdmin, selfUpdate } from './admin.ts';
+import { collectMetrics, hostInfo, HOST_ROOT } from './host.ts';
 import { containerAction, containerLogs, dockerAvailable, listContainers } from './docker.ts';
 import { SecurityScanner } from './security.ts';
 import { applyFix, isNativeRoot, previewFix } from './hardening.ts';
@@ -22,6 +22,7 @@ export async function createHostProvider(stateDir: string): Promise<Provider> {
         if (w?.cpu) info.cpuModel = w.cpu;
       }
       info.actions = allowActions;
+      info.mode = win ? 'windows' : HOST_ROOT ? 'docker' : 'native';
       info.canHarden = allowActions && isNativeRoot && !win;
       return info;
     },
@@ -52,6 +53,8 @@ export async function createHostProvider(stateDir: string): Promise<Provider> {
           if (scanner instanceof SecurityScanner) scanner.acceptKeys();
           return r;
         }
+        case 'agent.update':
+          return selfUpdate();
         case 'admin.apply':
           return applyAdmin(String(args.op), args.args ?? {}, { protectUser: typeof args.protectUser === 'string' ? args.protectUser : undefined });
         case 'harden.apply':

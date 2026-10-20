@@ -18,6 +18,7 @@ export function Servers() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  const [manual, setManual] = useState<any | null>(null);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -30,6 +31,24 @@ export function Servers() {
   const names = new Map(data.agents.map((a) => [a.id, a.name]));
   const toggle = (id: number) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const allShown = rows.length > 0 && rows.every((a) => sel.has(a.id));
+  const updatable = data.agents.filter((a) => a.outdated && a.online && a.info?.canHarden);
+  const outdated = data.agents.filter((a) => a.outdated);
+  const update = async (ids: number[]) => {
+    setBusy(true);
+    setErr('');
+    setMsg('');
+    try {
+      const r = await api<{ results: { id: number; ok: boolean; error?: string }[] }>('/agents/update', { body: { ids } });
+      const bad = r.results.filter((x) => !x.ok);
+      setMsg(`${t('servers.update_started', { n: r.results.length - bad.length })}${bad.length ? ' ' + bad.map((b) => `${names.get(b.id)}: ${b.error}`).join(' · ') : ''}`);
+      refresh();
+    } catch (e) {
+      setErr(t(`err.${(e as Error).message}`));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const installCmd = (a: any) => `curl -fsSL ${location.origin}/install.sh | sudo bash -s --${a.info?.mode === 'native' || a.info?.canHarden ? ' --native' : ''}${a.info?.actions ? ' --allow-actions' : ''}`;
   const mode = (a: any) => (!a.info ? '-' : a.info.canHarden ? t('servers.mode_full') : t('servers.mode_native'));
 
   const remove = async () => {
@@ -77,11 +96,13 @@ export function Servers() {
         <span className="grow" />
         {isAdmin && (
           <>
+            {updatable.length > 0 && <button className="btn primary" disabled={busy} onClick={() => update(updatable.map((a) => a.id))}>{t('servers.update_all', { n: updatable.length })}</button>}
             <button className="btn" onClick={() => setSel(new Set(data.agents.filter((a) => !a.online).map((a) => a.id)))}>{t('servers.select_offline')}</button>
             <button className="btn danger" disabled={sel.size === 0} onClick={() => setConfirm(true)}>{t('servers.delete_selected', { n: sel.size })}</button>
           </>
         )}
       </div>
+      {outdated.length > 0 && !msg && <div className="warn" style={{ marginBottom: 10 }}>{t('servers.outdated_hint', { n: outdated.length })}</div>}
       {msg && <div role="status" style={{ color: 'var(--ok)', marginBottom: 10 }}>{msg}</div>}
 
       <Card flush>
@@ -102,12 +123,15 @@ export function Servers() {
                     <td style={{ whiteSpace: 'nowrap' }}><StatusDot online={a.online} /></td>
                     <td className="muted">{a.info?.os ?? '-'}</td>
                     <td className="mono muted">{(a.ip ?? '').replace('::ffff:', '') || '-'}</td>
-                    <td className="muted" style={{ fontSize: 12.5 }}>{a.info?.agentVersion ?? '-'} · {mode(a)}</td>
+                    <td className="muted" style={{ fontSize: 12.5 }}>{a.info?.agentVersion ?? '-'} · {mode(a)}{a.outdated && <span className="pill" style={{ marginLeft: 8, color: 'var(--warn, #e0a030)' }}>{t('servers.outdated')}</span>}</td>
                     <td className="muted num" title={clock(a.lastSeen)}>{a.online ? '-' : ago(a.lastSeen)}</td>
                     <td className="r num">{a.openFindings}{a.openAlerts ? <span className="muted"> · {a.openAlerts} ⚑</span> : null}</td>
                     {isAdmin && (
                       <td className="r">
                         <div className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
+                          {a.outdated && (a.online && a.info?.canHarden
+                            ? <button className="btn sm primary" disabled={busy} onClick={() => update([a.id])}>{t('servers.update')}</button>
+                            : <button className="btn sm" onClick={() => setManual(a)}>{t('servers.update')}</button>)}
                           <button className="btn sm" onClick={() => setRename({ id: a.id, name: a.name })}>{t('servers.rename')}</button>
                           <button className="btn sm danger" onClick={() => { setSel(new Set([a.id])); setConfirm(true); }}>{t('common.delete')}</button>
                         </div>
@@ -129,6 +153,16 @@ export function Servers() {
           <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
             <button className="btn" disabled={busy} onClick={() => setConfirm(false)}>{t('common.cancel')}</button>
             <button className="btn danger" disabled={busy} onClick={remove}>{busy ? t('servers.deleting') : t('common.delete')}</button>
+          </div>
+        </Modal>
+      )}
+      {manual && (
+        <Modal title={t('servers.manual_title', { name: manual.name })} onClose={() => setManual(null)}>
+          <p className="muted" style={{ marginTop: 0, fontSize: 13.5 }}>{t(manual.info?.mode ? 'servers.manual_help' : 'servers.manual_help_old')}</p>
+          <pre className="mono" style={{ margin: '0 0 12px', padding: 10, background: 'var(--surface-2)', borderRadius: 8, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{installCmd(manual)}</pre>
+          <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
+            <button className="btn" onClick={() => void navigator.clipboard?.writeText(installCmd(manual))}>{t('servers.copy')}</button>
+            <button className="btn primary" onClick={() => setManual(null)}>{t('common.close')}</button>
           </div>
         </Modal>
       )}
