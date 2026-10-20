@@ -40,7 +40,6 @@ export function Overview() {
           <h1>{t('nav.overview')}</h1>
           <div className="sub">{t('overview.subtitle', { n: agents.length })}</div>
         </div>
-        <a className="btn primary" href="#/settings/enroll">+ {t('overview.add_host')}</a>
       </div>
 
       <div className="grid g4" style={{ marginBottom: 16 }}>

@@ -170,7 +170,7 @@ export function Gauge({ value, label, sub, size = 132, invert }: { value: number
     <div className="gauge" style={{ width: '100%', maxWidth: size }}>
       <svg viewBox="0 0 110 100" style={{ width: '100%', height: 'auto' }}>
         <path d={arc(55, 55, R, 135, 405)} fill="none" stroke="var(--line)" strokeWidth={9} strokeLinecap="round" />
-        {v > 0.5 && <path d={arc(55, 55, R, 135, end)} fill="none" stroke={color} strokeWidth={9} strokeLinecap="round" style={{ filter: `drop-shadow(0 0 5px ${color})` }} />}
+        {v > 0.5 && <path d={arc(55, 55, R, 135, end)} fill="none" stroke={color} strokeWidth={9} strokeLinecap="round" />}
         <text x="55" y="58" textAnchor="middle" className="g-val">{value == null ? '–' : Math.round(v)}<tspan className="g-unit">%</tspan></text>
         <text x="55" y="74" textAnchor="middle" className="g-label">{label}</text>
       </svg>
