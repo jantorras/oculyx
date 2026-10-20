@@ -1,3 +1,4 @@
+import { adminOverview, applyAdmin } from './admin.ts';
 import { collectMetrics, hostInfo } from './host.ts';
 import { containerAction, containerLogs, dockerAvailable, listContainers } from './docker.ts';
 import { SecurityScanner } from './security.ts';
@@ -33,6 +34,7 @@ export async function createHostProvider(stateDir: string): Promise<Provider> {
       if (action === 'docker.logs') return containerLogs(String(args.id), Number(args.tail ?? 200));
       const ports = () => (scanner instanceof SecurityScanner ? scanner.exposedTcpPorts() : []);
       if (action === 'ssh.list') return listHostKeys();
+      if (action === 'admin.overview') return adminOverview();
       if (action === 'harden.preview') return previewFix(String(args.fix), args.args ?? {}, ports);
       if (!allowActions) throw new Error('actions are disabled on this agent (OCULYX_ALLOW_ACTIONS=true to enable)');
       switch (action) {
@@ -50,6 +52,8 @@ export async function createHostProvider(stateDir: string): Promise<Provider> {
           if (scanner instanceof SecurityScanner) scanner.acceptKeys();
           return r;
         }
+        case 'admin.apply':
+          return applyAdmin(String(args.op), args.args ?? {}, { protectUser: typeof args.protectUser === 'string' ? args.protectUser : undefined });
         case 'harden.apply':
           return applyFix(String(args.fix), args.args ?? {}, ports);
         case 'fim.rebaseline':

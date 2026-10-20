@@ -7,6 +7,7 @@ import { Chart, Gauge } from '../components/Chart';
 import { ContainerTable } from './Containers';
 import { FindingList } from './Security';
 import { SshAccess } from './SshAccess';
+import { HostAdmin } from './HostAdmin';
 
 const RANGES = ['1h', '6h', '24h', '7d'];
 
@@ -26,7 +27,7 @@ export function HostDetail({ id, tab: tabParam }: { id: number; tab?: string }) 
     ['containers', `${t('nav.containers')}${a.docker ? ` (${a.docker.total})` : ''}`],
     ['security', `${t('nav.security')} (${a.findings.length})`],
     ['events', t('nav.events')],
-    ...(user.role === 'admin' ? ([['ssh', 'SSH']] as [string, string][]) : []),
+    ...(user.role === 'admin' ? ([['admin', t('adm.tab')], ['ssh', 'SSH']] as [string, string][]) : []),
   ];
 
   async function remove() {
@@ -125,6 +126,7 @@ export function HostDetail({ id, tab: tabParam }: { id: number; tab?: string }) 
         </Card>
       )}
 
+      {tab === 'admin' && user.role === 'admin' && <HostAdmin agentId={a.id} />}
       {tab === 'ssh' && user.role === 'admin' && <SshAccess agentId={a.id} name={a.name} onGoSecurity={() => (location.hash = `/hosts/${a.id}/security`)} />}
 
       {tab === 'events' && (

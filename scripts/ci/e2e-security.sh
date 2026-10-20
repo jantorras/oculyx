@@ -101,6 +101,25 @@ post "/agents/$ID/ssh/lockdown" '{"passwords":true}' | jq -e '.ok == true' >/dev
 sudo sshd -T | grep -qx 'passwordauthentication no' && ok "sshd refuses passwords"
 post "/agents/$ID/ssh/test" | jq -e '.ok == true' >/dev/null && ok "key login still works after the lockdown"
 post "/agents/$ID/ssh/unlock" '{}' >/dev/null && ok "unlock restored the previous settings"
+
+echo "== administration from the panel: accounts, services, guards"
+A="$(get "/agents/$ID/admin")"
+echo "$A" | jq -e '.canManage == true and (.users | length > 0) and (.services | length > 0)' >/dev/null && ok "overview lists accounts and services" || die "admin overview failed"
+adm() { code "/agents/$ID/admin" "{\"op\":\"$1\",\"args\":$2}"; }
+sudo useradd -m -s /bin/bash ocxtest
+[ "$(adm user.lock '{"user":"ocxtest"}')" = 200 ] && sudo passwd -S ocxtest | grep -q ' L ' && ok "account locked" || die "admin check failed"
+[ "$(adm user.unlock '{"user":"ocxtest"}')" = 200 ] && ok "account unlocked" || die "admin check failed"
+[ "$(adm user.sudo '{"user":"ocxtest","enable":true}')" = 200 ] && id -nG ocxtest | grep -qwE 'sudo|wheel|admin' && ok "sudo granted" || die "admin check failed"
+[ "$(adm user.sudo '{"user":"ocxtest","enable":false}')" = 200 ] && ok "sudo removed" || die "admin check failed"
+[ "$(adm user.delete '{"user":"ocxtest"}')" != 200 ] && ok "deleting needs confirmation" || die "admin check failed"
+[ "$(adm user.delete '{"user":"ocxtest","confirm":true}')" = 200 ] && ! id ocxtest >/dev/null 2>&1 && ok "account deleted" || die "admin check failed"
+[ "$(adm user.lock "{\"user\":\"$USER\"}")" != 200 ] && ok "the account the panel uses cannot be locked" || die "admin check failed"
+[ "$(adm user.lock '{"user":"root"}')" != 200 ] && ok "root is protected" || die "admin check failed"
+[ "$(adm svc.stop '{"unit":"ssh.service"}')" != 200 ] && ok "stopping sshd is refused" || die "admin check failed"
+[ "$(adm svc.stop '{"unit":"oculyx-agent.service"}')" != 200 ] && ok "the agent cannot stop itself" || die "admin check failed"
+[ "$(adm svc.restart '{"unit":"cron.service"}')" = 200 ] && ok "service restart works" || die "admin check failed"
+[ "$(adm ip.block '{"ip":"not-an-ip"}')" != 200 ] && ok "invalid IP rejected" || die "admin check failed"
+[ "$(adm ip.block '{"ip":"127.0.0.1"}')" != 200 ] && ok "blocking the server itself is refused" || die "admin check failed"
 post "/agents/$ID/fix" '{"fix":"ssh.revert"}' >/dev/null && ok "ssh.revert"
 test ! -e /etc/ssh/sshd_config.d/00-oculyx.conf && ok "drop-in removed"
 sudo userdel -r ocx-intruder 2>/dev/null || true

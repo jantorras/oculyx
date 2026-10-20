@@ -166,6 +166,26 @@ function simProvider(h: SimHost): Provider {
     },
     drainEvents: () => events.splice(0),
     async command(action, args) {
+      if (action === 'admin.overview') return {
+        users: [
+          { user: 'root', uid: 0, shell: '/bin/bash', login: true, locked: false, sudo: true },
+          { user: 'deploy', uid: 1000, shell: '/bin/bash', login: true, locked: false, sudo: true },
+          { user: 'maria', uid: 1001, shell: '/bin/bash', login: true, locked: false, sudo: false },
+          { user: 'backup', uid: 1002, shell: '/usr/sbin/nologin', login: false, locked: true, sudo: false },
+        ],
+        sessions: [{ user: 'deploy', tty: 'pts/0', since: '2026-10-20 09:14', from: '10.0.0.5' }],
+        services: [
+          { unit: 'nginx.service', active: 'active', sub: 'running', description: 'A high performance web server', enabled: 'enabled' },
+          { unit: 'postgresql.service', active: 'active', sub: 'exited', description: 'PostgreSQL RDBMS', enabled: 'enabled' },
+          { unit: 'cron.service', active: 'active', sub: 'running', description: 'Regular background program processing daemon', enabled: 'enabled' },
+          { unit: 'fail2ban.service', active: 'failed', sub: 'failed', description: 'Fail2Ban Service', enabled: 'enabled' },
+          { unit: 'redis-server.service', active: 'inactive', sub: 'dead', description: 'Advanced key-value store', enabled: 'disabled' },
+        ],
+        firewall: { tool: 'ufw', active: true, rules: ['22/tcp  ALLOW IN  Anywhere', '443/tcp  ALLOW IN  Anywhere', '80/tcp  ALLOW IN  Anywhere'] },
+        banned: ['185.220.101.34'], fail2ban: false,
+        updates: { pending: 14, security: 5 }, rebootRequired: true,
+      };
+      if (action === 'admin.apply') return { steps: [`${args.op}: done (demo)`] };
       if (action === 'ssh.list') return { keys: hostKeys, users: ['root', 'deploy'], passwordAuth: 'yes', permitRootLogin: 'yes', managed: false };
       if (action === 'ssh.authorize') {
         hostKeys.push({ user: String(args.user), type: 'ssh-ed25519', fingerprint: 'SHA256:' + Buffer.from(String(args.key)).toString('base64').slice(8, 51).padEnd(43, 'x'), comment: String(args.key).split(' ')[2] ?? '' });

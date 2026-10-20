@@ -336,6 +336,36 @@ app.post('/api/agents/:id/fix', admin, async (req, reply) => {
   }
 });
 
+// ---------- host administration (accounts, services, firewall, blocked IPs, updates, reboot) ----------
+app.get('/api/agents/:id/admin', admin, async (req, reply) => {
+  const id = Number((req.params as any).id);
+  try {
+    const overview = await hub.command(id, 'admin.overview', {}, 40_000);
+    const attackers = db.all(
+      `SELECT json_extract(data,'$.ip') AS ip, SUM(COALESCE(json_extract(data,'$.count'),1)) AS attempts, MAX(ts) AS last
+       FROM events WHERE agent_id=? AND type='ssh_failed' AND ts>? AND json_extract(data,'$.ip') IS NOT NULL
+       GROUP BY ip ORDER BY attempts DESC LIMIT 15`, id, Date.now() - 24 * 3600_000);
+    const info = JSON.parse(db.get('SELECT info FROM agents WHERE id=?', id)?.info ?? '{}');
+    return { ...overview, attackers, canManage: info.canHarden === true, sshUser: loadAccess(db, id)?.user ?? null };
+  } catch (e) {
+    return reply.code(502).send({ error: (e as Error).message });
+  }
+});
+app.post('/api/agents/:id/admin', admin, async (req, reply) => {
+  const id = Number((req.params as any).id);
+  const { op, args } = (req.body ?? {}) as { op?: string; args?: Record<string, unknown> };
+  if (!/^[a-z]+\.[a-z-]{2,24}$/.test(String(op ?? ''))) return reply.code(400).send({ error: 'bad_request' });
+  try {
+    const protectUser = loadAccess(db, id)?.user;
+    const out = await hub.command(id, 'admin.apply', { op, args: args ?? {}, protectUser }, 1_300_000);
+    audit(req.user!.username, `admin.${op}`, `${id}:${JSON.stringify(args ?? {}).slice(0, 120)}`, req.ip);
+    return out;
+  } catch (e) {
+    audit(req.user!.username, 'admin.failed', `${id}:${op}`, req.ip);
+    return reply.code(502).send({ error: (e as Error).message });
+  }
+});
+
 app.get('/api/alerts', viewer, async (req) => {
   const { state } = req.query as { state?: string };
   return db.all(
