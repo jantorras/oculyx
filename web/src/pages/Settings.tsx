@@ -1,9 +1,10 @@
+import { Section } from '../components/overlay';
 import { AiSettings } from './AiSettings';
 import { useState } from 'react';
 import { api, usePoll, clock, ago, getToken } from '../lib';
 import { useT } from '../i18n';
 import { useUser } from '../App';
-import { Card, Empty } from '../components/ui';
+import { Empty } from '../components/ui';
 import { AddHost } from './AddHost';
 
 export function Settings({ tab: tabParam }: { tab?: string }) {
@@ -13,11 +14,11 @@ export function Settings({ tab: tabParam }: { tab?: string }) {
   const tabs = isAdmin ? ['enroll', 'users', 'notify', 'detect', 'ai', 'sshkeys', 'domain', 'audit', 'account'] : ['account'];
   const tab = tabs.includes(tabParam ?? '') ? tabParam! : tabs[0];
   return (
-    <>
-      <div className="topbar"><h1>{t('nav.settings')}</h1></div>
-      <div className="tabs">
-        {tabs.map((k) => <button key={k} className={tab === k ? 'active' : ''} onClick={() => (location.hash = `/settings/${k}`)}>{t(`settings.${k}`)}</button>)}
-      </div>
+    <div className="page">
+      <div className="page-head"><h1>{t('nav.settings')}</h1></div>
+      <nav className="tabs filterbar" aria-label={t('nav.settings')}>
+        {tabs.map((k) => <button key={k} className={tab === k ? 'active' : ''} aria-current={tab === k ? 'page' : undefined} style={tab === k ? { background: 'var(--surface-2)', fontWeight: 650 } : undefined} onClick={() => (location.hash = `/settings/${k}`)}>{t(`settings.${k}`)}</button>)}
+      </nav>
       {tab === 'enroll' && <AddHost />}
       {tab === 'users' && <Users />}
       {tab === 'notify' && <Notify />}
@@ -27,7 +28,7 @@ export function Settings({ tab: tabParam }: { tab?: string }) {
       {tab === 'domain' && <Domain />}
       {tab === 'audit' && <Audit />}
       {tab === 'account' && <Account />}
-    </>
+    </div>
   );
 }
 
@@ -49,9 +50,9 @@ function Users() {
     }
   };
   return (
-    <div className="grid" style={{ maxWidth: 880 }}>
-      <Card title={t('users.add')}>
-        <form className="row wrap" onSubmit={add} style={{ alignItems: 'flex-end' }}>
+    <div className="grid">
+      <Section title={t('users.add')}>
+        <form className="grid g4" onSubmit={add} style={{ alignItems: 'end' }}>
           <label className="field"><span>{t('auth.username')}</span><input value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} required /></label>
           <label className="field"><span>{t('auth.password')}</span><input type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} minLength={10} required autoComplete="new-password" /></label>
           <label className="field"><span>{t('users.role')}</span>
@@ -63,9 +64,9 @@ function Users() {
         </form>
         {err && <div className="error" style={{ marginTop: 8 }}>{err}</div>}
         <p className="muted" style={{ fontSize: 12.5, marginBottom: 0 }}>{t('users.roles_help')}</p>
-      </Card>
-      <Card flush>
-        <div className="table-wrap"><table>
+      </Section>
+      <Section flush>
+        <div className="table-wrap"><table className="tbl-dense">
           <thead><tr><th>{t('auth.username')}</th><th>{t('users.role')}</th><th>{t('users.last_login')}</th><th /></tr></thead>
           <tbody>
             {(data ?? []).map((u) => (
@@ -82,7 +83,7 @@ function Users() {
             ))}
           </tbody>
         </table></div>
-      </Card>
+      </Section>
     </div>
   );
 }
@@ -103,8 +104,9 @@ function Notify() {
     setTimeout(() => setMsg(''), 2500);
   };
   return (
-    <div className="grid" style={{ maxWidth: 680 }}>
-      <Card title={t('notify.thresholds')}>
+    <div className="grid">
+      <div className="grid g2">
+      <Section title={t('notify.thresholds')}>
         <div className="grid g3">
           {(['cpu', 'mem', 'disk'] as const).map((k) => (
             <label className="field" key={k}>{k === 'cpu' ? 'CPU %' : k === 'mem' ? t('host.memory') + ' %' : t('host.disk') + ' %'}
@@ -112,15 +114,16 @@ function Notify() {
             </label>
           ))}
         </div>
-      </Card>
-      <Card title={t('notify.language')}>
+      </Section>
+      <Section title={t('notify.language')}>
         <label className="field" style={{ maxWidth: 260 }}>{t('notify.language_help')}
           <select value={v['notify.language'] ?? ''} onChange={(e) => set('notify.language', e.target.value)}>
             <option value="">English</option><option value="ca">Català</option><option value="es">Español</option>
           </select>
         </label>
-      </Card>
-      <Card title={t('notify.channels')}>
+      </Section>
+      </div>
+      <Section title={t('notify.channels')}>
         <div className="grid">
           <label className="field">Webhook URL (Slack, Discord, Teams…)<input value={v['notify.webhook'] ?? ''} onChange={(e) => set('notify.webhook', e.target.value)} placeholder="https://hooks.slack.com/…" /></label>
           <div className="grid g2">
@@ -128,7 +131,7 @@ function Notify() {
             <label className="field">Telegram chat ID<input value={v['notify.telegram_chat'] ?? ''} onChange={(e) => set('notify.telegram_chat', e.target.value)} /></label>
           </div>
         </div>
-      </Card>
+      </Section>
       <div className="row">
         <button className="btn primary" onClick={save}>{t('common.save')}</button>
         <button className="btn" onClick={() => api('/settings/test-notify', { method: 'POST', body: {} })}>{t('notify.test')}</button>
@@ -170,10 +173,10 @@ function SshKeys() {
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   };
   return (
-    <div className="grid" style={{ maxWidth: 880 }}>
-      <Card title={t('sshkeys.new')}>
+    <div className="grid">
+      <Section title={t('sshkeys.new')}>
         <p className="muted" style={{ marginTop: 0 }}>{t('sshkeys.intro')}</p>
-        <form className="grid" onSubmit={create}>
+        <form className="grid g2" onSubmit={create}>
           <label className="field">{t('sshkeys.name')}<input value={name} onChange={(e) => setName(e.target.value)} placeholder="admin-laptop" required maxLength={60} /></label>
           <details>
             <summary className="muted" style={{ cursor: 'pointer', fontSize: 13 }}>{t('sshkeys.import')}</summary>
@@ -190,10 +193,10 @@ function SshKeys() {
             <pre className="mono" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12, margin: '8px 0 0' }}>{fresh.public}</pre>
           </div>
         )}
-      </Card>
-      <Card flush>
+      </Section>
+      <Section flush>
         {!data || data.length === 0 ? <Empty>{t('sshkeys.none')}</Empty> : (
-          <div className="table-wrap"><table>
+          <div className="table-wrap"><table className="tbl-dense">
             <thead><tr><th>{t('sshkeys.name')}</th><th>{t('ssh.fingerprint')}</th><th>{t('sshkeys.created_col')}</th><th /></tr></thead>
             <tbody>{data.map((k) => (
               <tr key={k.id}>
@@ -211,7 +214,7 @@ function SshKeys() {
             ))}</tbody>
           </table></div>
         )}
-      </Card>
+      </Section>
       <p className="muted" style={{ fontSize: 12.5 }}>{t('sshkeys.security_note')}</p>
     </div>
   );
@@ -234,10 +237,10 @@ function Detect() {
   };
   const groups = ['access', 'accounts', 'persistence', 'processes', 'system'];
   return (
-    <div className="grid" style={{ maxWidth: 880 }}>
-      <Card title={t('detect.title')}>
+    <div className="grid">
+      <Section title={t('detect.title')}>
         <p className="muted" style={{ marginTop: 0 }}>{t('detect.intro')}</p>
-        <div className="row wrap" style={{ gap: 16, alignItems: 'flex-end' }}>
+        <div className="grid g3" style={{ alignItems: 'end' }}>
           <label className="field">{t('detect.min_sev')}
             <select value={data.minSeverity} onChange={(e) => put('/rules', { minSeverity: e.target.value })}>
               {['info', 'low', 'medium', 'high', 'critical'].map((s) => <option key={s} value={s}>{t(`sev.${s}`)}</option>)}
@@ -249,9 +252,10 @@ function Detect() {
           <span className="muted" style={{ fontSize: 12 }}>{t('detect.hours_help')}</span>
         </div>
         {err && <div className="error" role="alert" style={{ marginTop: 8 }}>{err}</div>}
-      </Card>
+      </Section>
+      <div className="grid g2">
       {groups.map((g) => (
-        <Card key={g} title={t(`rulegrp.${g}`)} flush>
+        <Section key={g} title={t(`rulegrp.${g}`)} flush>
           {data.rules.filter((r: any) => r.group === g).map((r: any) => (
             <div key={r.id} className="finding" style={{ gridTemplateColumns: 'auto 1fr auto', alignItems: 'center' }}>
               <label className="switch" title={r.enabled ? 'on' : 'off'}>
@@ -266,8 +270,9 @@ function Detect() {
               </select>
             </div>
           ))}
-        </Card>
+        </Section>
       ))}
+      </div>
     </div>
   );
 }
@@ -298,8 +303,8 @@ function Domain() {
   const stateLabel = !data.hasToken ? t('domain.not_configured') : t(`domain.state_${data.state}`);
   const tone = data.state === 'connected' ? 'var(--ok)' : data.state === 'error' ? 'var(--bad, #e5484d)' : 'var(--muted)';
   return (
-    <div className="grid" style={{ maxWidth: 680 }}>
-      <Card title={t('domain.title')}>
+    <div className="grid g2">
+      <Section title={t('domain.title')}>
         <p className="muted" style={{ marginTop: 0 }}>{t('domain.intro')}</p>
         {!data.available && <div className="error" role="alert">{t('domain.no_binary')}</div>}
         <div className="row" style={{ gap: 8, margin: '10px 0' }}>
@@ -307,7 +312,7 @@ function Domain() {
           <b>{stateLabel}</b>
           {data.state === 'connected' && data.hostname && <a href={`https://${data.hostname}`} target="_blank" rel="noreferrer">https://{data.hostname}</a>}
         </div>
-        <div className="grid">
+        <div className="grid g2">
           <label className="field">{t('domain.token')}
             <input type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" spellCheck={false}
               placeholder={data.hasToken ? t('domain.token_saved') : 'eyJhIjoi…'} />
@@ -325,8 +330,8 @@ function Domain() {
           {data.enabled && <button className="btn" disabled={busy} onClick={() => run('PUT', { enabled: false })}>{t('domain.disable')}</button>}
           {data.hasToken && <button className="btn danger" disabled={busy} onClick={() => { if (confirm(t('domain.confirm_remove'))) run('DELETE'); }}>{t('domain.remove')}</button>}
         </div>
-      </Card>
-      <Card title={t('domain.howto')}>
+      </Section>
+      <Section title={t('domain.howto')}>
         <ol className="muted" style={{ margin: 0, paddingLeft: 20, lineHeight: 1.7, fontSize: 13.5 }}>
           <li>{t('domain.step1')}</li>
           <li>{t('domain.step2')}</li>
@@ -334,11 +339,11 @@ function Domain() {
           <li>{t('domain.step4')}</li>
         </ol>
         <p className="muted" style={{ fontSize: 12.5, marginBottom: 0 }}>{t('domain.note')}</p>
-      </Card>
+      </Section>
       {data.log.length > 0 && (
-        <Card title={t('domain.log')}>
+        <Section title={t('domain.log')} fullWidth>
           <pre className="mono muted" style={{ margin: 0, fontSize: 11.5, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 220, overflow: 'auto' }}>{data.log.join('\n')}</pre>
-        </Card>
+        </Section>
       )}
     </div>
   );
@@ -348,9 +353,9 @@ function Audit() {
   const t = useT();
   const { data } = usePoll(() => api<any[]>('/audit'), 10000);
   return (
-    <Card flush>
+    <Section flush>
       {!data || data.length === 0 ? <Empty>{t('events.none')}</Empty> : (
-        <div className="table-wrap"><table>
+        <div className="table-wrap"><table className="tbl-dense">
             <thead><tr><th>{t('events.when')}</th><th>{t('auth.username')}</th><th>{t('audit.action')}</th><th>{t('audit.target')}</th><th>IP</th></tr></thead>
             <tbody>
               {data.map((r) => (
@@ -365,7 +370,7 @@ function Audit() {
             </tbody>
           </table></div>
       )}
-    </Card>
+    </Section>
   );
 }
 
@@ -387,14 +392,14 @@ function Account() {
     }
   };
   return (
-    <Card title={t('account.change_password')}>
-      <form className="grid" onSubmit={submit} style={{ maxWidth: 360 }}>
+    <Section title={t('account.change_password')}>
+      <form className="grid g2" onSubmit={submit}>
         <label className="field">{t('account.current')}<input type="password" value={f.current} onChange={(e) => setF({ ...f, current: e.target.value })} autoComplete="current-password" required /></label>
         <label className="field">{t('account.new')}<input type="password" value={f.next} onChange={(e) => setF({ ...f, next: e.target.value })} minLength={10} autoComplete="new-password" required /></label>
-        {err && <div className="error">{err}</div>}
-        {msg && <div style={{ color: 'var(--ok)' }}>{msg}</div>}
-        <div><button className="btn primary">{t('common.save')}</button></div>
+        {err && <div className="error" style={{ gridColumn: '1 / -1' }}>{err}</div>}
+        {msg && <div style={{ color: 'var(--ok)', gridColumn: '1 / -1' }}>{msg}</div>}
+        <div style={{ gridColumn: '1 / -1' }}><button className="btn primary">{t('common.save')}</button></div>
       </form>
-    </Card>
+    </Section>
   );
 }

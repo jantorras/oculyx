@@ -1,7 +1,8 @@
+import { Section } from '../components/overlay';
 import { useState } from 'react';
 import { api, usePoll, clock, getToken } from '../lib';
 import { useT } from '../i18n';
-import { Card, Icon } from '../components/ui';
+import { Icon } from '../components/ui';
 
 const NAME_RE = /^[A-Za-z0-9._-]{0,60}$/;
 
@@ -127,7 +128,7 @@ export function AddHost() {
   const pending = (tokens ?? []).filter((x) => x.used_by == null && (!x.expires || x.expires > Date.now()));
 
   return (
-    <div className="wizard">
+    <div className="grid">
       <ol className="stepper" aria-label={t('add.title')}>
         {[t('add.step1'), t('add.step2'), t('add.step3')].map((s, i) => (
           <li key={s} className={stage === i + 1 ? 'on' : stage > i + 1 ? 'done' : ''} aria-current={stage === i + 1 ? 'step' : undefined}>
@@ -156,9 +157,9 @@ export function AddHost() {
       {isLocal && <div className="banner warn" role="status">{t('add.local_warn', { url: base })}</div>}
 
       {stage === 1 && (
-        <Card title={t('add.step1')}>
+        <Section title={t('add.step1')}>
           <p className="muted" style={{ marginTop: 0 }}>{t('add.intro')}</p>
-          <form className="grid" onSubmit={generate} style={{ maxWidth: 560 }}>
+          <form className="grid g2" onSubmit={generate}>
             <label className="field">
               {t('add.name')}
               <input name="label" autoComplete="off" spellCheck={false} placeholder={t('add.name_ph')} value={label} onChange={(e) => setLabel(e.target.value)} aria-invalid={nameBad} aria-describedby="name-help" />
@@ -198,14 +199,14 @@ export function AddHost() {
               <input type="checkbox" checked={allow} onChange={(e) => setAllow(e.target.checked)} />
               <span><b>{t('add.allow')}</b><small>{t('add.allow_help')}</small></span>
             </label>
-            {error && <div className="error" role="alert">{error}</div>}
-            <div><button className="btn primary" disabled={nameBad}>{t('add.generate')} {Icon.arrow}</button></div>
+            {error && <div className="error" role="alert" style={{ gridColumn: '1 / -1' }}>{error}</div>}
+            <div style={{ gridColumn: '1 / -1' }}><button className="btn primary" disabled={nameBad}>{t('add.generate')} {Icon.arrow}</button></div>
           </form>
-        </Card>
+        </Section>
       )}
 
       {stage === 2 && fresh && (
-        <Card title={t('add.run_title')} actions={<span className="muted" style={{ fontSize: 12.5 }}>{t('add.expires', { time: clock(fresh.expires) })}</span>}>
+        <Section title={t('add.run_title')} actions={<span className="muted" style={{ fontSize: 12.5 }}>{t('add.expires', { time: clock(fresh.expires) })}</span>}>
           <p className="muted" style={{ marginTop: 0 }}>{fresh.os === 'windows' ? t('add.win_run_help') : `${t('add.run_help')} ${t('add.sudo_note')}`}</p>
           {fresh.os === 'windows' && settings?.windowsInstaller && (
             <div className="winapp">
@@ -258,7 +259,7 @@ export function AddHost() {
             </ul>
           </details>
           <div style={{ marginTop: 14 }}><button className="btn ghost sm" onClick={reset}>{t('add.regenerate')}</button></div>
-        </Card>
+        </Section>
       )}
 
       {stage === 3 && status?.agent && (

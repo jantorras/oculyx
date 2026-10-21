@@ -10,6 +10,34 @@ let toastSet: ((f: (t: Toast[]) => Toast[]) => void) | null = null;
 let askSet: ((a: Ask | null) => void) | null = null;
 let seq = 0;
 
+/** A full-width administration group using the shared section styles. */
+export function Section({ title, actions, children, flush, fullWidth }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; flush?: boolean; fullWidth?: boolean }) {
+  return (
+    <section className="sect" style={{ minWidth: 0, gridColumn: fullWidth ? '1 / -1' : undefined }}>
+      {(title || actions) && <header className="sect-title row wrap"><h2 className="grow">{title}</h2>{actions}</header>}
+      <div className={flush ? '' : 'grid'}>{children}</div>
+    </section>
+  );
+}
+
+/** A workspace dialog for tools that need the whole viewport. */
+export function WorkspaceModal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const t = useT();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={title} style={{ width: '100%', height: '100%', minHeight: 0 }}>
+        <header className="page-head"><h2 className="grow">{title}</h2><button className="btn sm" onClick={onClose} aria-label={t('common.close')}>×</button></header>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
 export function toast(text: string, kind: Toast['kind'] = 'ok') {
   const id = ++seq;
   toastSet?.((t) => [...t.slice(-3), { id, kind, text }]);

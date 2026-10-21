@@ -14,6 +14,8 @@ export const Icon = {
   chat: I('M21 12a8 8 0 01-11.7 7.1L4 20l1-4.6A8 8 0 1121 12zM8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01'),
   docker: I('M3 13h18M5 13V9h3v4M9 13V9h3v4M13 13V9h3v4M9 9V6h3v3M2 13c1 5 5 7 10 7 6 0 9-3 10-7'),
   shield: I('M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z'),
+  checks: I('M9 4h10v17H5V4h4M9 3h6v4H9zM8 12l2 2 4-4M8 18h8'),
+  close: I('M6 6l12 12M18 6L6 18'),
   bell: I('M6 9a6 6 0 1112 0c0 6 2 7 2 7H4s2-1 2-7M10 20a2 2 0 004 0'),
   log: I('M5 4h14v16H5zM9 9h6M9 13h6M9 17h3'),
   gear: I('M12 15a3 3 0 100-6 3 3 0 000 6zM19 12l2-1-2-4-2 1a7 7 0 00-2-1V5h-4v2a7 7 0 00-2 1L7 7 5 11l2 1v2l-2 1 2 4 2-1a7 7 0 002 1v2h4v-2a7 7 0 002-1l2 1 2-4-2-1z'),
@@ -101,7 +103,7 @@ export const Empty = ({ children }: { children: ReactNode }) => <div className="
 export function Card({ title, actions, children, flush }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; flush?: boolean }) {
   return (
     <section className="card">
-      {title && (
+      {(title || actions) && (
         <header>
           <h2 className="grow">{title}</h2>
           {actions}

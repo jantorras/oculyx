@@ -55,8 +55,8 @@ export function Checks() {
   useEffect(() => { if (data && data.hosts.every((h) => !h.sca && !h.inventory)) setTab('setup'); }, [!!data]); // eslint-disable-line
   if (!data || !pol.data) return <Skeleton />;
   return (
-    <div style={{ maxWidth: 1100 }}>
-      <div className="topbar">
+    <div className="page">
+      <div className="page-head">
         <div className="grow">
           <h1>{t('nav.checks')}</h1>
           <div className="sub">{t('chk.subtitle')}</div>
@@ -142,7 +142,8 @@ function Wizard({ hosts, profiles, initialHost, onDone }: { hosts: HostStatus[];
   );
 
   return (
-    <div className="wiz">
+    <div className="wiz sect">
+      <h2 className="sect-title">{steps[step]}</h2>
       <ol className="wiz-steps" aria-label={t('chk.steps')}>
         {steps.map((s, i) => <li key={s} className={i === step ? 'cur' : i < step ? 'done' : ''}><span>{i + 1}</span>{s}</li>)}
       </ol>
@@ -150,11 +151,11 @@ function Wizard({ hosts, profiles, initialHost, onDone }: { hosts: HostStatus[];
       {step === idx('what') && (
         <>
           <p className="muted" style={{ marginTop: 0 }}>{t('chk.intro')}</p>
-          <div className="chk-cards">
+          <div className="split">
             {CHECKS.map((id) => (
-              <article key={id} className={`chk-card ${on.has(id) ? 'on' : ''}`}>
+              <article key={id} className={`chk-card sect ${on.has(id) ? 'on' : ''}`}>
                 <header>
-                  <h3>{t(`chk.${id}.name`)}</h3>
+                  <h3 className="sect-title">{t(`chk.${id}.name`)}</h3>
                   {RECOMMENDED.includes(id) ? <span className="tag ok">{t('chk.recommended')}</span> : <span className="tag">{t('chk.needs_input')}</span>}
                   <button type="button" className={`toggle ${on.has(id) ? 'on' : ''}`} role="switch" aria-checked={on.has(id)} aria-label={t(`chk.${id}.name`)} onClick={() => toggle(id)}><i /></button>
                 </header>
@@ -175,7 +176,7 @@ function Wizard({ hosts, profiles, initialHost, onDone }: { hosts: HostStatus[];
           {on.has('fim') && (
             <Card title={t('chk.fim.name')}>
               <p className="muted small" style={{ marginTop: 0 }}>{t('chk.fim.help')}</p>
-              <h4 className="sec-title">{t('chk.fim.quick')}</h4>
+              <h4 className="sect-title">{t('chk.fim.quick')}</h4>
               <div className="chips">
                 {Object.entries(FIM_PRESETS).map(([k, list]) => {
                   const active = list.every((p) => paths.includes(p));
@@ -209,7 +210,7 @@ function Wizard({ hosts, profiles, initialHost, onDone }: { hosts: HostStatus[];
                   </label>
                 ))}
               </div>
-              <h4 className="sec-title" style={{ marginTop: 16 }}>{t('chk.logs.custom')}</h4>
+              <h4 className="sect-title" style={{ marginTop: 16 }}>{t('chk.logs.custom')}</h4>
               <p className="muted small" style={{ marginTop: 0 }}>{t('chk.logs.custom_help')}</p>
               {custom.map((c, i) => (
                 <div key={i} className="logrule">
@@ -246,7 +247,7 @@ function Wizard({ hosts, profiles, initialHost, onDone }: { hosts: HostStatus[];
               {profileId === 'new' && <label className="field">{t('pol.name')}<input value={newName} maxLength={60} onChange={(e) => setNewName(e.target.value)} /></label>}
             </div>
           )}
-          <h4 className="sec-title" style={{ marginTop: 16 }}>{mode === 'hosts' ? t('chk.which_hosts') : t('chk.also_add')}</h4>
+          <h4 className="sect-title" style={{ marginTop: 16 }}>{mode === 'hosts' ? t('chk.which_hosts') : t('chk.also_add')}</h4>
           {hosts.length === 0 ? <Empty>{t('pol.no_hosts')}</Empty> : (
             <div className="pol-hosts">
               {hosts.map((h) => (
@@ -282,15 +283,20 @@ function Wizard({ hosts, profiles, initialHost, onDone }: { hosts: HostStatus[];
 function Servers({ hosts, refresh, onEdit }: { hosts: HostStatus[]; refresh: () => void; onEdit: (id: number) => void }) {
   const t = useT();
   const [open, setOpen] = useState<HostStatus | null>(null);
+  const [query, setQuery] = useState('');
+  const shown = hosts.filter((h) => h.name.toLowerCase().includes(query.trim().toLowerCase()));
   if (!hosts.length) return <Empty>{t('pol.no_hosts')}</Empty>;
   const scoreCls = (s: number) => (s >= 80 ? 'ok' : s >= 60 ? 'warn' : 'bad');
   return (
     <>
-      <Card flush>
-        <table className="rows">
+      <section className="sect">
+        <h2 className="sect-title">{t('chk.tab_servers')} <span className="num muted">({shown.length})</span></h2>
+        <div className="filterbar" role="search"><input className="search" type="search" aria-label={t('pol.search_hosts')} placeholder={t('pol.search_hosts')} value={query} onChange={(e) => setQuery(e.target.value)} /></div>
+        <div className="table-wrap">
+        <table className="rows tbl-dense">
           <thead><tr><th>{t('pol.host')}</th><th>{t('chk.sca.short')}</th><th>{t('chk.cve.short')}</th><th>{t('chk.inventory.short')}</th><th>{t('chk.watching')}</th><th /></tr></thead>
           <tbody>
-            {hosts.map((h) => (
+            {shown.map((h) => (
               <tr key={h.id}>
                 <td><button className="linkish" onClick={() => setOpen(h)}><b>{h.name}</b></button>{!h.online && <span className="muted small"> · {t('chk.offline')}</span>}</td>
                 <td>{h.checks.sca.enabled ? (h.sca ? <span className={`score ${scoreCls(h.sca.score)}`}>{h.sca.score}<small>/100</small></span> : <span className="muted small">{t('chk.waiting')}</span>) : <span className="muted small">{t('pol.off')}</span>}</td>
@@ -304,7 +310,9 @@ function Servers({ hosts, refresh, onEdit }: { hosts: HostStatus[]; refresh: () 
             ))}
           </tbody>
         </table>
-      </Card>
+        </div>
+        {!shown.length && <Empty>{t('alerts.no_match')}</Empty>}
+      </section>
       {open && <HostChecks host={open} onClose={() => { setOpen(null); refresh(); }} />}
     </>
   );
@@ -340,7 +348,7 @@ function HostChecks({ host, onClose }: { host: HostStatus; onClose: () => void }
           {tab === 'sca' && (
             !data.sca ? <Empty>{t('chk.no_data')}</Empty> : (
               <>
-                <div className="row spread" style={{ marginBottom: 10 }}>
+                <div className="filterbar">
                   <div><span className="score big">{data.sca.score}<small>/100</small></span> <span className="muted small">{t('chk.updated', { t: ago(data.sca.ts) })}</span></div>
                   <div className="row" style={{ gap: 8 }}>
                     <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={showPass} onChange={(e) => setShowPass(e.target.checked)} style={{ width: 'auto' }} />{t('chk.show_passed')}</label>
@@ -362,17 +370,17 @@ function HostChecks({ host, onClose }: { host: HostStatus; onClose: () => void }
               <div className="notice">{data.vulns.status === 'unsupported' ? t('chk.cve_unsupported_long', { os: data.vulns.os?.id ?? '' }) : t('chk.cve_error_long', { e: data.vulns.error ?? '' })}</div>
             ) : (
               <>
-                <div className="row spread" style={{ marginBottom: 8 }}>
+                <div className="filterbar">
                   <span className="muted small">{t('chk.cve_summary', { n: items.length, p: data.vulns.packages, t: ago(data.vulns.ts) })}</span>
                   {user.role === 'admin' && <button className="btn sm" onClick={() => run('cve')}>{t('chk.run_now')}</button>}
                 </div>
                 {items.length === 0 ? <Empty>{t('chk.cve_none')}</Empty> : (
-                  <table className="rows"><thead><tr><th>{t('pol.severity')}</th><th>{t('chk.package')}</th><th>ID</th><th>{t('chk.fixed_in')}</th></tr></thead>
+                  <div className="table-wrap"><table className="rows tbl-dense"><thead><tr><th>{t('pol.severity')}</th><th>{t('chk.package')}</th><th>ID</th><th>{t('chk.fixed_in')}</th></tr></thead>
                     <tbody>{items.slice(0, 150).map((v) => (
                       <tr key={`${v.id}${v.pkg}`}><td><span className={`pill ${v.severity === 'critical' || v.severity === 'high' ? 'high' : v.severity === 'medium' ? 'medium' : 'ok'}`}>{v.severity === 'unknown' ? t('chk.unknown') : t(`sev.${v.severity}`)}</span></td>
                         <td><b>{v.pkg}</b> <span className="muted small">{v.version}</span><div className="muted small">{v.summary}</div></td>
                         <td className="mono small">{v.aliases?.[0] ?? v.id}</td><td className="mono small">{v.fixed || '—'}</td></tr>
-                    ))}</tbody></table>
+                    ))}</tbody></table></div>
                 )}
                 <p className="muted small">{t('chk.cve.privacy')}</p>
               </>
@@ -382,7 +390,7 @@ function HostChecks({ host, onClose }: { host: HostStatus; onClose: () => void }
             !data.inventory ? <Empty>{t('chk.no_data')}</Empty> : (
               <>
                 <div className="row spread"><span>{data.inventory.os?.name || data.inventory.os?.id} · {t('chk.n_packages', { n: data.inventory.packages })}</span>{user.role === 'admin' && <button className="btn sm" onClick={() => run('inventory')}>{t('chk.run_now')}</button>}</div>
-                <h4 className="sec-title" style={{ marginTop: 14 }}>{t('chk.services_on', { n: data.inventory.services.length })}</h4>
+                <h4 className="sect-title" style={{ marginTop: 14 }}>{t('chk.services_on', { n: data.inventory.services.length })}</h4>
                 <div className="chips">{data.inventory.services.map((s: string) => <span key={s} className="tag">{s}</span>)}</div>
                 <p className="muted small">{t('chk.inventory.explain')}</p>
               </>

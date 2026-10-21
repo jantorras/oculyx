@@ -18,9 +18,9 @@ export function AlertInfo({ rule, compact }: { rule: string; compact?: boolean }
   const x = e && (e[lang] ?? e.en);
   if (!x) return null;
   return (
-    <div className={`alert-info ${compact ? 'compact' : ''}`}>
+    <div className={`alert-info ${compact ? 'compact' : 'sect'}`}>
       <p>{x.meaning}</p>
-      {!compact && <p className="todo"><b>{t('alerts.what_to_do')}</b> {x.todo}</p>}
+      {!compact && <div className="todo"><h4 className="sect-title">{t('alerts.what_to_do')}</h4><p>{x.todo}</p></div>}
     </div>
   );
 }

@@ -35,22 +35,24 @@ export function Overview() {
   };
 
   return (
-    <div className="page-in">
-      <div className="topbar">
+    <div className="page page-in">
+      <div className="page-head">
         <div className="grow">
           <h1>{t('nav.overview')}</h1>
           <div className="sub">{t('overview.subtitle', { n: agents.length })}</div>
         </div>
       </div>
 
-      <div className="grid g4" style={{ marginBottom: 16 }}>
+      <div className="kpi-row">
         <Kpi icon={Icon.hosts} label={t('overview.hosts_online')} value={online} unit={`/ ${agents.length}`} tone={online === agents.length ? 'ok' : 'warn'} hint={agents.length - online > 0 ? t('overview.offline_n', { n: agents.length - online }) : t('overview.all_up')} />
         <Kpi icon={Icon.bell} label={t('overview.active_alerts')} value={data.alerts.length} tone={data.alerts.length ? 'bad' : 'ok'} hint={t('overview.alerts_hint')} />
         <Kpi icon={Icon.shield} label={t('overview.urgent_findings')} value={urgent} tone={urgent ? 'high' : 'ok'} hint={t('overview.findings_hint', { n: totalFindings })} />
         <Kpi icon={Icon.overview} label={t('overview.avg_score')} value={avg ?? '–'} unit="/ 100" tone={avg == null ? undefined : avg >= 85 ? 'ok' : avg >= 60 ? 'warn' : 'bad'} hint={t('overview.score_hint')} />
       </div>
 
-      <div className="grid g-main" style={{ marginBottom: 16 }}>
+      <section className="sect">
+      <h2 className="sect-title">{t('host.resources')}</h2>
+      <div className="split">
         <Card
           title={t('overview.fleet_usage')}
           actions={
@@ -75,9 +77,11 @@ export function Overview() {
           />
         </Card>
       </div>
+      </section>
 
-      <div className="row" style={{ marginBottom: 12 }}>
-        <h2 style={{ fontSize: 16 }}>{t('overview.hosts')}</h2>
+      <section className="sect">
+      <div className="filterbar">
+        <h2 className="sect-title grow">{t('overview.hosts')}</h2>
         <div className="seg view-toggle">
           <button className={view === 'cards' ? 'active' : ''} onClick={() => setViewP('cards')}>{t('overview.view_cards')}</button>
           <button className={view === 'table' ? 'active' : ''} onClick={() => setViewP('table')}>{t('overview.view_table')}</button>
@@ -96,8 +100,11 @@ export function Overview() {
       ) : (
         <HostTable agents={agents} />
       )}
+      </section>
 
-      <div className="grid g3" style={{ marginTop: 16 }}>
+      <section className="sect">
+      <h2 className="sect-title">{t('overview.activity')}</h2>
+      <div className="grid g3">
         <Card title={t('overview.network')} actions={<div className="legend-inline"><span><i style={{ background: 'var(--c3)' }} />↓</span><span><i style={{ background: 'var(--c4)' }} />↑</span></div>}>
           <Chart height={150} data={fleet ?? []} format={rate} axisFormat={(v) => rate(v).replace('/s', '')} series={[{ key: 'rx', label: '↓ rx', color: 'var(--c3)' }, { key: 'tx', label: '↑ tx', color: 'var(--c4)' }]} />
         </Card>
@@ -108,8 +115,11 @@ export function Overview() {
           <Donut center={`${dockerRun}/${dockerAll}`} caption={t('overview.running')} size={140} slices={[{ label: t('overview.running'), value: dockerRun, color: 'var(--ok)' }, { label: t('overview.stopped'), value: dockerAll - dockerRun, color: 'var(--high)' }]} />
         </Card>
       </div>
+      </section>
 
-      <div className="grid g2" style={{ marginTop: 16 }}>
+      <section className="sect">
+      <h2 className="sect-title">{t('overview.recent_events')}</h2>
+      <div className="grid g2">
         <Card title={t('overview.active_alerts')} flush actions={<a className="muted" href="#/alerts">{t('common.view_all')}</a>}>
           {data.alerts.length === 0 ? <Empty>{t('alerts.none')}</Empty> : data.alerts.slice(0, 6).map((a: any) => (
             <div className="timeline-item" key={a.id}>
@@ -136,6 +146,7 @@ export function Overview() {
           ))}
         </Card>
       </div>
+      </section>
     </div>
   );
 }
@@ -178,9 +189,8 @@ function HostCard({ a }: { a: any }) {
 function HostTable({ agents }: { agents: any[] }) {
   const t = useT();
   return (
-    <Card flush>
       <div className="table-wrap">
-        <table>
+        <table className="tbl-dense">
           <thead><tr><th>{t('host.name')}</th><th>CPU</th><th>{t('host.memory')}</th><th>{t('host.disk')}</th><th>{t('host.network')}</th><th>{t('nav.containers')}</th><th>{t('host.alerts')}</th><th className="r">{t('host.score')}</th></tr></thead>
           <tbody>
             {agents.map((a) => (
@@ -201,7 +211,6 @@ function HostTable({ agents }: { agents: any[] }) {
           </tbody>
         </table>
       </div>
-    </Card>
   );
 }
 

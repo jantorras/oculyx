@@ -42,7 +42,7 @@ function smooth(pts: [number, number][]): string {
 export function Chart({ data, series, format, max, height = 170, axisFormat }: ChartProps) {
   const uid = useId().replace(/:/g, '');
   const [hover, setHover] = useState<number | null>(null);
-  if (data.length < 2) return <div className="chart-empty" style={{ height }} />;
+  if (data.length < 2) return <div className="chart-empty" style={{ height, width: '100%' }} />;
 
   const PADT = 10;
   const top = niceMax(max ?? Math.max(1e-9, ...data.flatMap((d) => series.map((s) => d[s.key] ?? 0))) * 1.1, max != null);
@@ -68,14 +68,14 @@ export function Chart({ data, series, format, max, height = 170, axisFormat }: C
   };
 
   return (
-    <div className="chart2">
+    <div className="chart2" style={{ width: '100%', minWidth: 0 }}>
       <div className="yaxis" style={{ height }}>
         {ticks.map((g) => (
           <span key={g} style={{ top: `${((y(top * g) ) / height) * 100}%` }}>{fmtAxis(top * g)}</span>
         ))}
       </div>
-      <div className="plot" onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
-        <svg viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" style={{ height }} role="img">
+      <div className="plot" style={{ minWidth: 0 }} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+        <svg viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" style={{ height, width: '100%', display: 'block' }} role="img" aria-label={series.map((s) => s.label).join(', ')}>
           <defs>
             {series.map((s, i) => (
               <linearGradient key={s.key} id={`${uid}-${i}`} x1="0" y1="0" x2="0" y2="1">
@@ -193,7 +193,7 @@ export function Donut({ slices, center, caption, size = 150 }: { slices: Slice[]
   let offset = 0;
   return (
     <div className="donut-wrap">
-      <svg viewBox="0 0 100 100" width={size} height={size} role="img">
+      <svg viewBox="0 0 100 100" width={size} height={size} style={{ maxWidth: '100%', flexShrink: 0 }} role="img" aria-label={caption}>
         <circle cx="50" cy="50" r={R} fill="none" stroke="var(--line)" strokeWidth={11} />
         {total > 0 &&
           slices

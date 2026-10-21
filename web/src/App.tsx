@@ -69,17 +69,23 @@ function Shell({ onLogout }: { onLogout: () => void }) {
 
   useEffect(() => setOpen(false), [route]);
 
-  const nav: [string, string, ReactNode, boolean?][] = [
-    ['/', 'nav.overview', Icon.overview],
-    ['/servers', 'nav.servers', Icon.overview],
-    ['/containers', 'nav.containers', Icon.docker],
-    ['/security', 'nav.security', Icon.shield],
-    ['/assistant', 'nav.assistant', Icon.chat],
-    ['/alerts', 'nav.alerts', Icon.bell],
-    ['/checks', 'nav.checks', Icon.shield],
-    ['/policies', 'nav.policies', Icon.sliders],
-    ['/events', 'nav.events', Icon.log],
-    ['/settings', 'nav.settings', Icon.gear],
+  const nav: { group: string; items: [string, string, ReactNode][] }[] = [
+    { group: 'monitoring', items: [
+      ['/', 'nav.overview', Icon.overview],
+      ['/servers', 'nav.servers', Icon.hosts],
+      ['/containers', 'nav.containers', Icon.docker],
+      ['/events', 'nav.events', Icon.log],
+    ] },
+    { group: 'security', items: [
+      ['/security', 'nav.security', Icon.shield],
+      ['/checks', 'nav.checks', Icon.checks],
+    ] },
+    { group: 'alerts', items: [
+      ['/alerts', 'nav.alerts', Icon.bell],
+      ['/policies', 'nav.policies', Icon.sliders],
+    ] },
+    { group: 'tools', items: [['/assistant', 'nav.assistant', Icon.chat]] },
+    { group: 'administration', items: [['/settings', 'nav.settings', Icon.gear]] },
   ];
 
   const active = (p: string) => (p === '/' ? route === '/' || route.startsWith('/hosts') : route.startsWith(p));
@@ -104,9 +110,11 @@ function Shell({ onLogout }: { onLogout: () => void }) {
   return (
     <div className="app">
       <a className="skip" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById('main')?.focus(); }}>{t('common.skip')}</a>
-      <aside className={`side ${open ? 'open' : ''}`}>
+      {open && <button className="side-backdrop" onClick={() => setOpen(false)} aria-label={t('common.close')} />}
+      <aside className={`side ${open ? 'open' : ''}`} id="sidebar" onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}>
         <div className="brand">
           <Logo /> oculyx
+          <button className="btn ghost sm side-close" onClick={() => setOpen(false)} aria-label={t('common.close')}>{Icon.close}</button>
         </div>
         {user.role === 'admin' && (
           <a className="btn primary side-add" href="#/settings/enroll">
@@ -114,12 +122,17 @@ function Shell({ onLogout }: { onLogout: () => void }) {
           </a>
         )}
         <nav className="nav">
-          {nav.map(([to, key, icon]) => (
-            <a key={to} href={`#${to}`} className={active(to) ? 'active' : ''}>
-              {icon}
-              {t(key)}
-              {to === '/alerts' && openAlerts && openAlerts.length > 0 && <span className="count">{openAlerts.length}</span>}
-            </a>
+          {nav.map(({ group, items }) => (
+            <section className="nav-group" key={group} aria-labelledby={`nav-${group}`}>
+              <h2 className="nav-heading" id={`nav-${group}`}>{t(`nav.group.${group}`)}</h2>
+              {items.map(([to, key, icon]) => (
+                <a key={to} href={`#${to}`} className={active(to) ? 'active' : ''} aria-current={active(to) ? 'page' : undefined}>
+                  {icon}
+                  {t(key)}
+                  {to === '/alerts' && openAlerts && openAlerts.length > 0 && <span className="count">{openAlerts.length}</span>}
+                </a>
+              ))}
+            </section>
           ))}
         </nav>
         <div className="foot">
@@ -147,7 +160,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
         </div>
       </aside>
       <main className="main" id="main" tabIndex={-1}>
-        <button className="btn menu-btn" style={{ marginBottom: 14 }} onClick={() => setOpen(!open)} aria-label={t('common.menu')} aria-expanded={open}>
+        <button className="btn menu-btn" onClick={() => setOpen(!open)} aria-label={t('common.menu')} aria-expanded={open} aria-controls="sidebar">
           {Icon.menu}
         </button>
         {page}

@@ -42,8 +42,8 @@ export function FixDialog({ agentId, fix, onClose, onDone }: { agentId: number; 
     <Modal title={pv?.title ?? t('fix.title')} onClose={onClose}>
       {!pv && !err && <div className="muted">{t('fix.loading')}</div>}
       {pv && !result && (
-        <>
-          <div className="muted" style={{ fontSize: 13 }}>{t('fix.will_do')}</div>
+        <section className="sect">
+          <h3 className="sect-title">{t('fix.will_do')}</h3>
           <ul className="steps">{pv.steps.map((s, i) => <li key={i}><span className="mono">{s}</span></li>)}</ul>
           {pv.warning && <div className="warn">{pv.warning}</div>}
           {pv.confirm && (
@@ -52,16 +52,16 @@ export function FixDialog({ agentId, fix, onClose, onDone }: { agentId: number; 
               <span>{t('fix.ack')}</span>
             </label>
           )}
-        </>
+        </section>
       )}
       {result && (
-        <>
-          <div style={{ color: 'var(--ok)', fontWeight: 600 }}>{t('fix.done')}</div>
+        <section className="sect">
+          <h3 className="sect-title" style={{ color: 'var(--ok)' }}>{t('fix.done')}</h3>
           <ul className="steps">{result.map((s, i) => <li key={i}><span className="mono">{s}</span></li>)}</ul>
-        </>
+        </section>
       )}
       {err && <div className="error" role="alert">{err}</div>}
-      <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
+      <div className="filterbar" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
         <button className="btn" onClick={onClose}>{result ? t('common.close') : t('common.cancel')}</button>
         {pv && !result && <button className="btn primary" disabled={busy || (pv.confirm && !ack)} onClick={run}>{busy ? t('fix.running') : t('fix.apply')}</button>}
       </div>

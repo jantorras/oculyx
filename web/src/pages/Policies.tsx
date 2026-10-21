@@ -26,8 +26,8 @@ export function Policies() {
     rules: Object.fromEntries(data.rules.map((r) => [r.id, { enabled: r.global.enabled, severity: r.global.severity }])),
   };
   return (
-    <div style={{ maxWidth: 1100 }}>
-      <div className="topbar">
+    <div className="page">
+      <div className="page-head">
         <div className="grow">
           <h1>{t('nav.policies')}</h1>
           <div className="sub">{t('pol.subtitle')}</div>
@@ -97,18 +97,7 @@ function Profiles({ data, base, refresh }: { data: Data; base: Effective; refres
   };
 
   return (
-    <div className="pol-layout">
-      <aside className="pol-list" aria-label={t('pol.tab_profiles')}>
-        {data.profiles.map((p) => (
-          <button key={p.id} className={`pol-item ${sel === p.id ? 'active' : ''}`} onClick={() => setSel(p.id)}>
-            <b>{p.name}</b>
-            <span className="muted small">{t('pol.n_hosts', { n: p.hosts.length })}</span>
-          </button>
-        ))}
-        <button className={`pol-item new ${sel === 'new' ? 'active' : ''}`} onClick={() => setSel('new')}>+ {t('pol.new')}</button>
-        <p className="muted small" style={{ margin: '10px 4px 0' }}>{t('pol.order_help')}</p>
-      </aside>
-
+    <div className="split">
       <div className="grid" style={{ minWidth: 0 }}>
         <Card title={sel === 'new' ? t('pol.new') : cur?.name}
           actions={<div className="row" style={{ gap: 8 }}>{cur && <button className="btn sm" onClick={duplicate}>{t('pol.duplicate')}</button>}{cur && <button className="btn sm danger" onClick={remove}>{t('pol.delete')}</button>}</div>}>
@@ -121,7 +110,7 @@ function Profiles({ data, base, refresh }: { data: Data; base: Effective; refres
         <Card title={t('pol.hosts_in')}>
           {data.hosts.length === 0 ? <Empty>{t('pol.no_hosts')}</Empty> : (
             <>
-              <input className="search" placeholder={t('pol.search_hosts')} value={q} onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 10, maxWidth: 280 }} />
+              <div className="filterbar" role="search"><input className="search" type="search" aria-label={t('pol.search_hosts')} placeholder={t('pol.search_hosts')} value={q} onChange={(e) => setQ(e.target.value)} /></div>
               <div className="pol-hosts">
                 {shown.map((h) => {
                   const other = h.profileId && h.profileId !== sel ? data.profiles.find((p) => p.id === h.profileId)?.name : '';
@@ -148,6 +137,19 @@ function Profiles({ data, base, refresh }: { data: Data; base: Effective; refres
           {err && <span className="error" role="alert">{err}</span>}
         </div>
       </div>
+      <aside className="sect" aria-label={t('pol.tab_profiles')}>
+        <h2 className="sect-title">{t('pol.tab_profiles')}</h2>
+        <div className="grid">
+          {data.profiles.map((p) => (
+            <button key={p.id} className={`pol-item ${sel === p.id ? 'active' : ''}`} onClick={() => setSel(p.id)}>
+              <b>{p.name}</b>
+              <span className="muted small">{t('pol.n_hosts', { n: p.hosts.length })}</span>
+            </button>
+          ))}
+          <button className={`pol-item new ${sel === 'new' ? 'active' : ''}`} onClick={() => setSel('new')}>+ {t('pol.new')}</button>
+          <p className="muted small">{t('pol.order_help')}</p>
+        </div>
+      </aside>
     </div>
   );
 }
@@ -156,6 +158,7 @@ const WINDOWS = [30, 120, 480, 1440];
 
 function Hosts({ data, base, refresh }: { data: Data; base: Effective; refresh: () => void }) {
   const t = useT();
+  const [query, setQuery] = useState('');
   const [edit, setEdit] = useState<HostRow | null>(null);
   const [sel, setSel] = useState<Set<number>>(new Set());
   const names = new Map(data.profiles.map((p) => [p.id, p.name]));
@@ -171,10 +174,12 @@ function Hosts({ data, base, refresh }: { data: Data; base: Effective; refresh: 
     ...WINDOWS.map((m) => ({ label: t('pol.silence_for', { d: label(m) }), onClick: () => mute(ids, m) })),
     ...(active ? ['sep' as const, { label: t('pol.end_maint'), onClick: () => mute(ids, null) }] : []),
   ];
-  const allSel = data.hosts.length > 0 && data.hosts.every((h) => sel.has(h.id));
+  const shown = data.hosts.filter((h) => h.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const allSel = shown.length > 0 && shown.every((h) => sel.has(h.id));
 
   return (
     <>
+      <div className="filterbar" role="search"><input className="search" type="search" aria-label={t('pol.search_hosts')} placeholder={t('pol.search_hosts')} value={query} onChange={(e) => setQuery(e.target.value)} /></div>
       <Card flush title={t('pol.tab_hosts')}
         actions={sel.size > 0 ? (
           <select aria-label={t('pol.maintenance')} value="" onChange={(e) => e.target.value && mute([...sel], Number(e.target.value))}>
@@ -183,15 +188,15 @@ function Hosts({ data, base, refresh }: { data: Data; base: Effective; refresh: 
           </select>
         ) : undefined}>
         {data.hosts.length === 0 ? <Empty>{t('pol.no_hosts')}</Empty> : (
-          <table className="rows">
+          <div className="table-wrap"><table className="rows tbl-dense">
             <thead>
               <tr>
-                <th style={{ width: 32 }}><input type="checkbox" checked={allSel} onChange={() => setSel(allSel ? new Set() : new Set(data.hosts.map((h) => h.id)))} aria-label={t('pol.select_all')} /></th>
+                <th style={{ width: 32 }}><input type="checkbox" checked={allSel} onChange={() => setSel((current) => { const next = new Set(current); shown.forEach((h) => allSel ? next.delete(h.id) : next.add(h.id)); return next; })} aria-label={t('pol.select_all')} /></th>
                 <th>{t('pol.host')}</th><th>{t('pol.profile')}</th><th>{t('pol.exceptions')}</th><th>{t('pol.maintenance')}</th>
               </tr>
             </thead>
             <tbody>
-              {data.hosts.map((h) => (
+              {shown.map((h) => (
                 <tr key={h.id}>
                   <td><input type="checkbox" checked={sel.has(h.id)} onChange={() => setSel((s) => { const n = new Set(s); n.has(h.id) ? n.delete(h.id) : n.add(h.id); return n; })} aria-label={h.name} /></td>
                   <td><a href={`#/hosts/${h.id}`}><b>{h.name}</b></a></td>
@@ -211,13 +216,16 @@ function Hosts({ data, base, refresh }: { data: Data; base: Effective; refresh: 
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table>{!shown.length && <Empty>{t('alerts.no_match')}</Empty>}</div>
         )}
       </Card>
-      <label className="optrow" style={{ marginTop: 14 }}>
+      <section className="sect" style={{ marginTop: 14 }}>
+      <h2 className="sect-title">{t('pol.maintenance')}</h2>
+      <label className="optrow">
         <span className="grow"><b>{t('pol.critical_breaks')}</b><span className="muted small" style={{ display: 'block' }}>{t('pol.critical_breaks_hint')}</span></span>
         <button type="button" className={`toggle ${data.criticalBreaks ? 'on' : ''}`} role="switch" aria-checked={data.criticalBreaks} onClick={async () => { await api('/maintenance/settings', { method: 'PUT', body: { criticalBreaks: !data.criticalBreaks } }); refresh(); }}><i /></button>
       </label>
+      </section>
       {edit && <HostExceptions host={edit} rules={data.rules} onClose={() => { setEdit(null); refresh(); }} />}
     </>
   );

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { api, usePoll, ago, clock } from '../lib';
 import { useT } from '../i18n';
 import { useUser } from '../App';
-import { Card, Empty, Modal, Skeleton, StatusDot } from '../components/ui';
+import { Empty, Modal, Skeleton, StatusDot } from '../components/ui';
 import { Menu } from '../components/overlay';
 
 /** Fleet administration: every host that ever connected, with rename and (bulk) removal. */
@@ -85,8 +85,8 @@ export function Servers() {
   };
 
   return (
-    <>
-      <div className="topbar">
+    <div className="page">
+      <div className="page-head">
         <div className="grow">
           <h1>{t('nav.servers')}</h1>
           <div className="sub">{t('servers.subtitle')}</div>
@@ -94,7 +94,9 @@ export function Servers() {
         {isAdmin && <a className="btn primary" href="#/settings/enroll">{t('servers.add')}</a>}
       </div>
 
-      <div className="row wrap" style={{ gap: 10, marginBottom: 14, alignItems: 'center' }}>
+      <section className="sect">
+      <h2 className="sect-title">{t('nav.servers')}</h2>
+      <div className="filterbar">
         <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('servers.search')} aria-label={t('servers.search')} style={{ minWidth: 220, flex: '1 1 220px', maxWidth: 360 }} />
         <div className="seg">
           {(['all', 'online', 'offline'] as const).map((f) => <button key={f} className={filter === f ? 'active' : ''} onClick={() => setFilter(f)}>{t(`servers.${f}`)}</button>)}
@@ -111,10 +113,9 @@ export function Servers() {
       {outdated.length > 0 && !msg && <div className="warn" style={{ marginBottom: 10 }}>{t('servers.outdated_hint', { n: outdated.length })}</div>}
       {msg && <div role="status" style={{ color: 'var(--ok)', marginBottom: 10 }}>{msg}</div>}
 
-      <Card flush>
         {rows.length === 0 ? <Empty>{t('servers.none')}</Empty> : (
           <div className="table-wrap">
-            <table>
+            <table className="tbl-dense">
               <thead>
                 <tr>
                   {isAdmin && <th style={{ width: 36 }}><input type="checkbox" checked={allShown} onChange={() => setSel(allShown ? new Set() : new Set(rows.map((a) => a.id)))} aria-label="select all" /></th>}
@@ -153,7 +154,7 @@ export function Servers() {
             </table>
           </div>
         )}
-      </Card>
+      </section>
 
       {confirm && (
         <Modal title={t('servers.confirm_title', { n: sel.size })} onClose={() => !busy && setConfirm(false)}>
@@ -188,6 +189,6 @@ export function Servers() {
           </form>
         </Modal>
       )}
-    </>
+    </div>
   );
 }

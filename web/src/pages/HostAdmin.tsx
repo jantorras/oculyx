@@ -56,7 +56,7 @@ export function HostAdmin({ agentId }: { agentId: number }) {
   ];
 
   const head = (title: string, help: string) => (
-    <div className="sec-head">
+    <div className="page-head">
       <div className="grow"><h2>{title}</h2><p className="muted">{help}</p></div>
     </div>
   );
@@ -79,10 +79,10 @@ export function HostAdmin({ agentId }: { agentId: number }) {
         {!can && <div className="notice">{t('sshw.readonly')}</div>}
 
         {section === 'accounts' && (
-          <section>
+          <section className="sect">
             {head(t('adm.users'), t('adm.users_help'))}
-            <div className="panel">
-              <table className="rows">
+            <div className="panel table-wrap">
+              <table className="rows tbl-dense">
                 <thead><tr><th>{t('ssh.user')}</th><th>{t('adm.access')}</th><th /></tr></thead>
                 <tbody>{users.map((u) => {
                   const self = u.user === data.sshUser;
@@ -121,14 +121,14 @@ export function HostAdmin({ agentId }: { agentId: number }) {
         )}
 
         {section === 'services' && (
-          <section>
+          <section className="sect">
             {head(t('adm.services'), t('adm.services_help'))}
-            <div className="toolbar">
+            <div className="filterbar">
               <input type="search" value={svcQ} onChange={(e) => setSvcQ(e.target.value)} placeholder={t('adm.search')} aria-label={t('adm.search')} />
               <label className="check"><input type="checkbox" checked={onlyActive} onChange={(e) => setOnlyActive(e.target.checked)} />{t('adm.only_running')}</label>
             </div>
-            <div className="panel">
-              <table className="rows">
+            <div className="panel table-wrap">
+              <table className="rows tbl-dense">
                 <thead><tr><th>{t('adm.services')}</th><th>{t('adm.state')}</th><th>{t('adm.boot')}</th><th /></tr></thead>
                 <tbody>{shown.map((s) => {
                   const on = s.active === 'active';
@@ -160,21 +160,21 @@ export function HostAdmin({ agentId }: { agentId: number }) {
         )}
 
         {section === 'network' && (
-          <section>
+          <section className="sect">
             {head(t('adm.network'), t('adm.network_help'))}
 
-            <h3 className="sub">{t('adm.ips')}</h3>
+            <h3 className="sect-title">{t('adm.ips')}</h3>
             <p className="muted small">{t('adm.ips_help')}</p>
-            <form className="toolbar" onSubmit={(e) => { e.preventDefault(); const v = ip.trim(); if (v) { setIp(''); void sure(t('adm.block_title', { ip: v }), t('adm.confirm_block', { ip: v }), `ip:${v}`, 'ip.block', { ip: v }, t('adm.block'), true); } }}>
+            <form className="filterbar" onSubmit={(e) => { e.preventDefault(); const v = ip.trim(); if (v) { setIp(''); void sure(t('adm.block_title', { ip: v }), t('adm.confirm_block', { ip: v }), `ip:${v}`, 'ip.block', { ip: v }, t('adm.block'), true); } }}>
               <input value={ip} onChange={(e) => setIp(e.target.value)} placeholder="203.0.113.7  ·  198.51.100.0/24" spellCheck={false} aria-label="IP" />
               <button className="btn primary" disabled={lock || !ip.trim()}>{t('adm.block')}</button>
             </form>
             <div className="split">
               <div>
-                <div className="cap">{t('adm.attackers')}</div>
-                <div className="panel">
+                <div className="sect-title">{t('adm.attackers')}</div>
+                <div className="panel table-wrap">
                   {data.attackers.length === 0 ? <Empty>{t('adm.no_attackers')}</Empty> : (
-                    <table className="rows"><tbody>{data.attackers.map((a: any) => (
+                    <table className="rows tbl-dense"><tbody>{data.attackers.map((a: any) => (
                       <tr key={a.ip}>
                         <td className="mono">{a.ip}</td>
                         <td className="muted num">{a.attempts} {t('adm.attempts')}</td>
@@ -185,30 +185,30 @@ export function HostAdmin({ agentId }: { agentId: number }) {
                 </div>
               </div>
               <div>
-                <div className="cap">{t('adm.blocked_list')}</div>
-                <div className="panel">
+                <div className="sect-title">{t('adm.blocked_list')}</div>
+                <div className="panel table-wrap">
                   {banned.length === 0 ? <Empty>{t('adm.none_blocked')}</Empty> : (
-                    <table className="rows"><tbody>{banned.map((b) => (
+                    <table className="rows tbl-dense"><tbody>{banned.map((b) => (
                       <tr key={b}><td className="mono">{b}</td><td className="act"><button className="btn sm" disabled={lock} onClick={() => run(`unb:${b}`, 'ip.unblock', { ip: b })}>{t('adm.unblock')}</button></td></tr>))}</tbody></table>
                   )}
                 </div>
               </div>
             </div>
 
-            <h3 className="sub" style={{ marginTop: 28 }}>{t('adm.firewall')}</h3>
+            <h3 className="sect-title" style={{ marginTop: 28 }}>{t('adm.firewall')}</h3>
             <div className="fw-state">
               <span className={`state ${data.firewall.active ? 'on' : ''}`}><i />{data.firewall.active ? t('adm.fw_on') : t('adm.fw_off')}</span>
               {!data.firewall.active && <a className="btn sm" href={`#/hosts/${agentId}/security`}>{t('adm.fw_enable')}</a>}
             </div>
             {data.firewall.active && (
               <>
-                <form className="toolbar" onSubmit={(e) => { e.preventDefault(); if (port) { const p = Number(port); setPort(''); void run('fw:open', 'fw.open', { port: p, proto: 'tcp' }); } }}>
+                <form className="filterbar" onSubmit={(e) => { e.preventDefault(); if (port) { const p = Number(port); setPort(''); void run('fw:open', 'fw.open', { port: p, proto: 'tcp' }); } }}>
                   <input type="number" min={1} max={65535} value={port} onChange={(e) => setPort(e.target.value)} placeholder="443" aria-label="port" style={{ width: 140 }} />
                   <button className="btn primary" disabled={lock || !port}>{t('adm.open_port')}</button>
                 </form>
-                <div className="panel">
+                <div className="panel table-wrap">
                   {(data.firewall.rules as string[]).length === 0 ? <Empty>{t('adm.no_rules')}</Empty> : (
-                    <table className="rows"><tbody>{(data.firewall.rules as string[]).map((r) => {
+                    <table className="rows tbl-dense"><tbody>{(data.firewall.rules as string[]).map((r) => {
                       const m = r.match(/^(\d+)(?:\/(tcp|udp))?\s+ALLOW IN\s+Anywhere$/);
                       return (
                         <tr key={r}><td className="mono">{r}</td>
@@ -223,7 +223,7 @@ export function HostAdmin({ agentId }: { agentId: number }) {
         )}
 
         {section === 'system' && (
-          <section>
+          <section className="sect">
             {head(t('adm.system'), t('adm.system_help'))}
             <div className="panel list">
               <div className="item">

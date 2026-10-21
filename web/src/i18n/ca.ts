@@ -1,4 +1,5 @@
 export const ca: Record<string, string> = {
+  'nav.group.monitoring': 'Monitoratge', 'nav.group.security': 'Seguretat', 'nav.group.alerts': 'Alertes', 'nav.group.tools': 'Eines', 'nav.group.administration': 'Administració',
   'common.loading': 'Carregant…', 'common.save': 'Desa', 'common.saved': 'Desat', 'common.add': 'Afegeix', 'common.delete': 'Elimina', 'common.close': 'Tanca',
   'common.copy': 'Copia l’ordre', 'common.search': 'Cerca…', 'common.view_all': 'Veure-ho tot', 'common.actions': 'Accions',
   'auth.title': 'Inicia la sessió', 'auth.subtitle': 'Monitoritza, protegeix i gestiona els teus servidors.', 'auth.username': 'Usuari', 'auth.password': 'Contrasenya', 'auth.login': 'Entra', 'auth.logout': 'Surt',

@@ -59,8 +59,8 @@ export function Alerts() {
   };
 
   return (
-    <div className="page-in">
-      <div className="topbar">
+    <div className="page page-in">
+      <div className="page-head">
         <div className="grow">
           <h1>{t('nav.alerts')}</h1>
           <div className="sub">{t('alerts.subtitle')}</div>
@@ -74,7 +74,7 @@ export function Alerts() {
       </div>
 
       <div className="alerts-top">
-        <dl className="statgrid">
+        <dl className="statgrid kpi-row">
           <div className={stats.open ? 'hot' : ''}>
             <dt>{t('alerts.open_n')}</dt>
             <dd className="num">{stats.open}</dd>
@@ -117,7 +117,9 @@ export function Alerts() {
         </Card>
       </div>
 
-      <div className="toolbar" role="search">
+      <section className="sect">
+      <h2 className="sect-title">{t(state === 'active' ? 'alerts.active' : 'alerts.history')} <span className="muted num">({filtered.length})</span></h2>
+      <div className="filterbar" role="search">
         <div className="seg" role="tablist" aria-label={t('alerts.state')}>
           <button role="tab" aria-selected={state === 'active'} className={state === 'active' ? 'active' : ''} onClick={() => set({ state: null })}>{t('alerts.active')}</button>
           <button role="tab" aria-selected={state === 'history'} className={state === 'history' ? 'active' : ''} onClick={() => set({ state: 'history' })}>{t('alerts.history')}</button>
@@ -156,33 +158,30 @@ export function Alerts() {
           )}
         </section>
       ) : (
-        <section className="card alert-list" aria-live="polite">
+        <div className="table-wrap" aria-live="polite">
+          <table className="rows tbl-dense">
+            <thead><tr><th>{t('security.severity')}</th><th>{t('nav.alerts')}</th><th>{t('pol.host')}</th><th>{t('alerts.state')}</th><th>{t('alerts.opened')}</th><th>{t('common.actions')}</th></tr></thead>
+            <tbody>
           {filtered.slice(0, shown).map((a) => {
             const closed = a.state === 'closed';
             return (
-              <article key={a.id} className={`alert-row ${a.state}`} style={{ ['--sev' as string]: SEV_COLOR[a.severity] }}>
-                <span className="sevbar" aria-hidden />
-                <div className="ar-main">
-                  <div className="ar-title">
-                    <SevPill sev={a.severity} />
-                    <h3>{t(`rule.${a.rule.split(':')[0]}`)}</h3>
-                  </div>
-                  <p className="ar-msg">{a.message}</p>
-                  <AlertInfo rule={a.rule} />
-                  <a className="chip ar-host" href={`#/hosts/${a.agent_id}`}>
-                    {Icon.hosts}
-                    {a.agent}
-                  </a>
-                </div>
-                <div className="ar-meta">
+              <tr key={a.id} className={a.state} data-severity={a.severity} style={{ ['--row-severity' as string]: SEV_COLOR[a.severity] }}>
+                <td><SevPill sev={a.severity} /></td>
+                <td>
+                  <b>{t(`rule.${a.rule.split(':')[0]}`)}</b>
+                  <div style={{ overflowWrap: 'anywhere' }}>{a.message}</div>
+                  <details><summary className="muted small">{t('alerts.what_to_do')}</summary><AlertInfo rule={a.rule} /></details>
+                </td>
+                <td><a href={`#/hosts/${a.agent_id}`}>{a.agent}</a></td>
+                <td>
                   <span className={`pill ${a.state === 'open' ? 'high' : a.state === 'ack' ? 'medium' : 'ok'}`}>{t(`alerts.state_${a.state}`)}</span>
-                  <span className="num muted" title={clock(a.opened)}>
-                    {Icon.clock}
+                </td>
+                <td><span className="num muted" title={clock(a.opened)}>
                     {closed ? `${t('alerts.lasted')} ${duration(a.closed - a.opened)}` : `${ago(a.opened)}`}
                   </span>
-                  {closed && <span className="muted" style={{ fontSize: 12 }}>{ago(a.closed)} · {clock(a.opened)}</span>}
-                </div>
-                <div className="ar-actions">
+                  {closed && <div className="muted small">{ago(a.closed)} · {clock(a.opened)}</div>}
+                </td>
+                <td><div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
                   {a.state === 'open' && canOperate(user) && (
                     <button className="btn sm" onClick={() => ack(a.id)}>
                       {Icon.check}
@@ -193,17 +192,20 @@ export function Alerts() {
                     {t('alerts.view_host')}
                     {Icon.arrow}
                   </a>
-                </div>
-              </article>
+                </div></td>
+              </tr>
             );
           })}
+            </tbody>
+          </table>
           {filtered.length > shown && (
             <button className="btn more" onClick={() => setShown(shown + PAGE)}>
               {t('common.show_more', { n: Math.min(PAGE, filtered.length - shown) })}
             </button>
           )}
-        </section>
+        </div>
       )}
+      </section>
     </div>
   );
 }

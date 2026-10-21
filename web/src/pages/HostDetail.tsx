@@ -37,11 +37,12 @@ export function HostDetail({ id, tab: tabParam }: { id: number; tab?: string }) 
   }
 
   return (
-    <>
-      <div className="topbar">
+    <div className="page">
+      <div className="filterbar">
         <a href="#/" className="muted">← {t('nav.overview')}</a>
       </div>
-      <div className="row wrap" style={{ marginBottom: 20, gap: 18 }}>
+      <div className="page-head">
+        <div className="row grow">
         <Score value={a.score} large />
         <div className="grow">
           <h1>{a.name}</h1>
@@ -53,29 +54,38 @@ export function HostDetail({ id, tab: tabParam }: { id: number; tab?: string }) 
             {!a.online && <span>{t('host.last_seen')} {ago(a.lastSeen)}</span>}
           </div>
         </div>
+        </div>
         {user.role === 'admin' && (
           <button className="btn danger sm" onClick={remove}>{t('host.remove')}</button>
         )}
       </div>
 
-      <div className="tabs" role="tablist">
+      <section className="sect">
+      <div className="tabs" role="tablist" aria-label={a.name}>
         {tabs.map(([k, label]) => (
-          <button key={k} role="tab" className={tab === k ? 'active' : ''} onClick={() => (location.hash = `/hosts/${id}/${k}`)}>{label}</button>
+          <button key={k} id={`host-tab-${k}`} role="tab" aria-selected={tab === k} aria-controls="host-tab-panel" className={tab === k ? 'active' : ''} onClick={() => (location.hash = `/hosts/${id}/${k}`)}>{label}</button>
         ))}
       </div>
+      </section>
 
+      <div className="grid" id="host-tab-panel" role="tabpanel" aria-labelledby={`host-tab-${tab}`}>
       {tab === 'metrics' && (
         <>
-          <Card title={t('host.resources')} actions={<div className="legend-inline"><span>{t('host.load')}: <b className="num" style={{ color: 'var(--text)' }}>{m?.load1?.toFixed(2) ?? '-'}</b></span></div>}>
+          <section className="sect">
+          <div className="filterbar">
+            <h2 className="sect-title grow">{t('host.resources')}</h2>
+            <span className="muted">{t('host.load')}: <b className="num" style={{ color: 'var(--text)' }}>{m?.load1?.toFixed(2) ?? '-'}</b></span>
+          </div>
             <div className="gauges">
               <Gauge size={150} value={m?.cpu} label="CPU" sub={`${a.info?.cpus ?? '?'} cores`} />
               <Gauge size={150} value={m?.mem} label={t('host.memory')} sub={m ? `${bytes(m.memUsed)} / ${bytes(m.memTotal, 0)}` : undefined} />
               <Gauge size={150} value={m?.disk} label={t('host.disk')} sub={m ? `${bytes(m.diskUsed, 0)} / ${bytes(m.diskTotal, 0)}` : undefined} />
               {a.info?.platform !== 'win32' && <Gauge size={150} value={m && a.info?.cpus ? Math.min(100, (m.load1 / a.info.cpus) * 100) : null} label={t('host.load')} sub={`${m?.load1?.toFixed(2) ?? '-'} / ${a.info?.cpus ?? '?'}`} />}
             </div>
-          </Card>
-          <div className="row" style={{ justifyContent: 'space-between', margin: '20px 0 12px' }}>
-            <h2 style={{ fontSize: 16 }}>{t('host.history')}</h2>
+          </section>
+          <section className="sect">
+          <div className="filterbar">
+            <h2 className="sect-title grow">{t('host.history')}</h2>
             <div className="seg">
               {RANGES.map((r) => (
                 <button key={r} className={range === r ? 'active' : ''} onClick={() => setRange(r)}>{r}</button>
@@ -90,7 +100,10 @@ export function HostDetail({ id, tab: tabParam }: { id: number; tab?: string }) 
             </Card>
             {a.info?.platform !== 'win32' && <Card title={t('host.load')} actions={<span className="num" style={{ color: 'var(--c5)' }}>{m?.load1?.toFixed(2)}</span>}><Chart data={series ?? []} series={[{ key: 'load1', label: t('host.load'), color: 'var(--c5)' }]} format={(v) => v.toFixed(2)} axisFormat={(v) => v.toFixed(1)} /></Card>}
           </div>
-          <div className="grid g2" style={{ marginTop: 16 }}>
+          </section>
+          <section className="sect">
+          <h2 className="sect-title">{t('host.system')}</h2>
+          <div className="split">
             <Card title={t('host.system')}>
               <dl className="kv">
                 <dt>{t('host.hostname')}</dt><dd>{a.info?.hostname}</dd>
@@ -113,33 +126,50 @@ export function HostDetail({ id, tab: tabParam }: { id: number; tab?: string }) 
               <p className="muted" style={{ fontSize: 12, margin: '12px 0 0' }}>{t('host.ports_legend')}</p>
             </Card>
           </div>
+          </section>
         </>
       )}
 
       {tab === 'containers' && (
-        a.containers ? <Card flush><ContainerTable rows={a.containers.map((c: any) => ({ ...c, agentId: a.id, agent: a.name, online: a.online }))} hideHost onChange={refresh} canAct={canOperate(user) && a.online} /></Card> : <Card><Empty>{t('containers.no_docker')}</Empty></Card>
+        <section className="sect">
+          <h2 className="sect-title">{t('nav.containers')}</h2>
+          {a.containers ? <ContainerTable rows={a.containers.map((c: any) => ({ ...c, agentId: a.id, agent: a.name, online: a.online }))} hideHost onChange={refresh} canAct={canOperate(user) && a.online} /> : <Empty>{t('containers.no_docker')}</Empty>}
+        </section>
       )}
 
       {tab === 'security' && (
+        <section className="sect">
+        <h2 className="sect-title">{t('nav.security')}</h2>
         <Card title={t('security.findings')} flush actions={canOperate(user) && a.findings.some((f: any) => f.check_id.startsWith('fim:')) ? <button className="btn sm" disabled={!a.online} onClick={async () => { await api(`/agents/${id}/fim/accept`, { method: 'POST', body: {} }).catch((e) => alert(e.message)); refresh(); }}>{t('security.accept_fim')}</button> : undefined}>
           <FindingList rows={a.findings} onChange={refresh} />
         </Card>
+        </section>
       )}
 
       {tab === 'admin' && user.role === 'admin' && <HostAdmin agentId={a.id} />}
       {tab === 'ssh' && user.role === 'admin' && <SshAccess agentId={a.id} name={a.name} onGoSecurity={() => (location.hash = `/hosts/${a.id}/security`)} />}
 
       {tab === 'events' && (
-        <Card flush>
-          {a.events.length === 0 ? <Empty>{t('events.none')}</Empty> : a.events.map((e: any) => (
-            <div className="finding" key={e.id} style={{ padding: '10px 16px' }}>
-              <SevPill sev={e.severity} />
-              <div><div>{e.message}</div><div className="muted mono" style={{ fontSize: 11.5 }}>{e.type}</div></div>
-              <span className="muted num" title={clock(e.ts)}>{ago(e.ts)}</span>
+        <section className="sect">
+          <h2 className="sect-title">{t('nav.events')}</h2>
+          {a.events.length === 0 ? <Empty>{t('events.none')}</Empty> : (
+            <div className="table-wrap">
+              <table className="tbl-dense">
+                <thead><tr><th>{t('security.severity')}</th><th>{t('events.type')}</th><th>{t('events.message')}</th><th className="r">{t('events.when')}</th></tr></thead>
+                <tbody>{a.events.map((e: any) => (
+                  <tr key={e.id}>
+                    <td><SevPill sev={e.severity} /></td>
+                    <td className="mono muted">{e.type}</td>
+                    <td>{e.message}</td>
+                    <td className="r num muted" title={clock(e.ts)}>{ago(e.ts)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
             </div>
-          ))}
-        </Card>
+          )}
+        </section>
       )}
-    </>
+      </div>
+    </div>
   );
 }

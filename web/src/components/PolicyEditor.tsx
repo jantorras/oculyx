@@ -53,8 +53,8 @@ export function PolicyEditor({ value, onChange, inherited, rules, from }: {
 
   return (
     <div className="grid" style={{ gap: 18 }}>
-      <section>
-        <h3 className="sec-title">{t('pol.limits')}</h3>
+      <section className="sect">
+        <h3 className="sect-title">{t('pol.limits')}</h3>
         <p className="muted small" style={{ margin: '0 0 10px' }}>{t('pol.limits_help', { from })}</p>
         <div className="pol-limits">
           {(['cpu', 'mem', 'disk'] as const).map((k) => (
@@ -78,8 +78,8 @@ export function PolicyEditor({ value, onChange, inherited, rules, from }: {
         const list = rules.filter((r) => r.group === g);
         if (!list.length) return null;
         return (
-          <section key={g}>
-            <h3 className="sec-title">{t(`rulegrp.${g}`)}</h3>
+          <section key={g} className="sect">
+            <h3 className="sect-title">{t(`rulegrp.${g}`)}</h3>
             <div className="pol-rules">
               {list.map((r) => {
                 const v = value.rules?.[r.id] ?? {};

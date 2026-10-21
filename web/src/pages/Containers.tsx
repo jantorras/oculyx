@@ -21,21 +21,29 @@ export function Containers() {
   const rows = data.filter((c) => !q || `${c.name} ${c.image} ${c.agent}`.toLowerCase().includes(q.toLowerCase()));
   const running = data.filter((c) => c.state === 'running').length;
   return (
-    <>
-      <div className="topbar">
+    <div className="page">
+      <div className="page-head">
         <div className="grow">
           <h1>{t('nav.containers')}</h1>
           <div className="sub">{hostId ? t('containers.subtitle_one', { running, total: data.length, name: hosts.find((h) => h.id === hostId)?.name ?? '' }) : t('containers.subtitle', { running, total: data.length })}</div>
         </div>
+      </div>
+      <section className="sect">
+      <h2 className="sect-title">{t('nav.containers')}</h2>
+      <div className="filterbar">
         <select value={hostId || ''} onChange={(e) => setHashQuery({ host: e.target.value || null })} aria-label={t('containers.server')} name="host">
           <option value="">{t('containers.all_servers')} ({all.length})</option>
           {hosts.map((h) => (
             <option key={h.id} value={h.id}>{h.name} ({h.total}){h.online ? '' : ` - ${t('status.offline')}`}</option>
           ))}
         </select>
-        <input type="search" name="q" autoComplete="off" spellCheck={false} placeholder={t('common.search')} value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 240 }} aria-label={t('common.search')} />
+        <input type="search" name="q" autoComplete="off" spellCheck={false} placeholder={t('common.search')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('common.search')} />
       </div>
-      <div className="grid g3" style={{ marginBottom: 16 }}>
+        {rows.length === 0 ? <Empty>{t('containers.none')}</Empty> : <ContainerTable rows={rows} hideHost={!!hostId} onChange={refresh} canAct={canOperate(user)} />}
+      </section>
+      <section className="sect">
+      <h2 className="sect-title">{t('host.resources')}</h2>
+      <div className="grid g3">
         <Card title={t('containers.by_state')}>
           <Donut size={130} center={data.length} caption={t('nav.containers')} slices={[
             { label: t('overview.running'), value: running, color: 'var(--ok)' },
@@ -50,10 +58,8 @@ export function Containers() {
           <HBars thresholds={false} max={Math.max(1, ...data.map((c) => c.mem ?? 0))} format={(v) => bytes(v, 0)} rows={[...data].filter((c) => c.mem != null).sort((a, b) => b.mem - a.mem).slice(0, 5).map((c) => ({ label: c.name, value: c.mem, sub: c.agent }))} />
         </Card>
       </div>
-      <Card flush>
-        {rows.length === 0 ? <Empty>{t('containers.none')}</Empty> : <ContainerTable rows={rows} hideHost={!!hostId} onChange={refresh} canAct={canOperate(user)} />}
-      </Card>
-    </>
+      </section>
+    </div>
   );
 }
 
@@ -92,7 +98,7 @@ export function ContainerTable({ rows, hideHost, onChange, canAct }: { rows: any
     <>
       {error && <div className="banner warn" role="alert" style={{ margin: 12 }}>{error}</div>}
       <div className="table-wrap">
-        <table>
+        <table className="tbl-dense">
           <thead>
             <tr>
               <th>{t('containers.name')}</th>

@@ -71,7 +71,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .nav a.active { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
 .nav .count { margin-left: auto; font-size: 11px; font-family: var(--mono); background: var(--crit); color: #fff; border-radius: 99px; padding: 0 6px; line-height: 17px; }
 .side .foot { margin-top: auto; padding: 10px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
-.main { min-width: 0; padding: 26px 32px 60px; max-width: 1480px; width: 100%; }
+.main { min-width: 0; padding: 26px 32px 60px; width: 100%; }
 .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; flex-wrap: wrap; }
 .topbar .sub { color: var(--muted); font-size: 13px; }
 .menu-btn { display: none; }
@@ -195,3 +195,94 @@ td.r, th.r { text-align: right; }
   .kv { grid-template-columns: 100px 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* Monitoring workspace. Scope shell primitives so later legacy visual layers
+   cannot restore width caps, loose spacing, or non-scrolling navigation. */
+.app { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+.app .main { width: 100%; max-width: none; height: 100%; min-height: 0; overflow: auto; padding: 18px 22px 28px; scrollbar-gutter: stable; }
+.app .side { height: 100vh; height: 100dvh; min-height: 0; overflow-y: auto; padding: 12px 10px; background: var(--surface); border-color: var(--line-strong); }
+.app .brand { padding-bottom: 12px; }
+.app .side-add { margin-bottom: 8px; flex-shrink: 0; }
+.app .nav { padding-bottom: 12px; }
+.nav-group + .nav-group { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+.nav-heading { margin: 0 10px 4px; font-size: 10px; line-height: 1.6; font-weight: 650; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+.app .nav a { padding: 6px 10px; border-radius: 4px; font-size: 13px; }
+.app .nav a.active { margin-left: 0; padding-left: 10px; border-radius: 4px; color: var(--text); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); box-shadow: inset 3px 0 0 var(--accent); }
+.app .side .foot { padding: 10px 4px 0; gap: 8px; flex-shrink: 0; }
+.app .side-close, .side-backdrop { display: none; }
+.app .menu-btn { margin-bottom: 12px; }
+
+/* Shared page contract: all columns can shrink and every page spans its pane. */
+.main .page { width: 100%; max-width: none; min-width: 0; min-height: 100%; display: flex; flex-direction: column; gap: 14px; }
+.main .page-head, .main .topbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 0 0 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line-strong); }
+.main .page > .page-head { margin-bottom: 0; }
+.page-head > :first-child { min-width: 0; }
+.page-head h1 { font-size: 21px; line-height: 1.3; }
+.page-head p, .page-head .sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.main .sect { min-width: 0; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 5px; padding: 14px; }
+.sect-title { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: 0.065em; text-transform: uppercase; }
+.sect-title::after { content: ''; height: 1px; background: var(--line-strong); flex: 1; }
+.main .filterbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; min-width: 0; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--surface-2); }
+.filterbar > * { min-width: 0; max-width: 100%; }
+.filterbar input:not([type='checkbox']):not([type='radio']) { flex: 1 1 220px; width: auto; }
+.filterbar select { width: auto; }
+.filterbar label.field { flex: 1 1 150px; }
+.main .split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.main .split > *, .kpi-row > * { min-width: 0; }
+.main .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 10px; }
+.app .card { border-radius: 5px; border-color: var(--line-strong); box-shadow: none; }
+.app .card > header, .main .sect > header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 10px 14px; border-bottom: 1px solid var(--line-strong); background: var(--surface-2); border-radius: 4px 4px 0 0; }
+.main .sect > header { margin: -14px -14px 14px; }
+.app .card > header h2, .main .sect > header h2 { font-size: 13px; font-weight: 650; }
+.app .card > .body { padding: 14px; }
+.app .grid { gap: 14px; }
+.app .kpi, .app .tile { padding: 12px 14px; }
+.app .kpi .value, .app .tile .value { font-size: 25px; }
+.app .kpi .ico { color: var(--k, var(--muted)); }
+.app .btn, .app input, .app select, .app textarea { border-radius: 4px; }
+
+/* Bounded table scrolling keeps headings visible in both page and panel flows. */
+.main .table-wrap { max-width: 100%; max-height: 70vh; max-height: 70dvh; overflow: auto; border-radius: 4px; }
+.main table thead th { position: sticky; top: 0; z-index: 2; background: var(--surface-2); box-shadow: inset 0 -1px 0 var(--line-strong); }
+.main table th { font-weight: 600; }
+.main table.tbl-dense th, .main .tbl-dense table th { padding: 7px 10px; font-size: 11.5px; }
+.main table.tbl-dense td, .main .tbl-dense table td { padding: 7px 10px; font-size: 12.5px; }
+.main table tbody tr:hover > td { background: var(--surface-2); }
+.main table tbody tr { --row-severity: transparent; }
+.main table tbody tr > td:first-child { box-shadow: inset 3px 0 0 var(--row-severity); }
+.main table tbody tr:is(.critical, .sev-critical, [data-severity='critical']), .main table tbody tr:has(.pill.critical) { --row-severity: var(--crit); }
+.main table tbody tr:is(.high, .sev-high, [data-severity='high']), .main table tbody tr:has(.pill.high) { --row-severity: var(--high); }
+.main table tbody tr:is(.medium, .sev-medium, [data-severity='medium']), .main table tbody tr:has(.pill.medium) { --row-severity: var(--med); }
+.main table tbody tr:is(.low, .sev-low, [data-severity='low']), .main table tbody tr:has(.pill.low) { --row-severity: var(--low); }
+.main table tbody tr:is(.info, .sev-info, [data-severity='info']), .main table tbody tr:has(.pill.info) { --row-severity: var(--info); }
+.main .finding { padding: 10px 14px; border-left: 3px solid transparent; }
+.main .finding:has(.pill.critical) { border-left-color: var(--crit); }
+.main .finding:has(.pill.high) { border-left-color: var(--high); }
+.main .finding:has(.pill.medium) { border-left-color: var(--med); }
+.main .finding:has(.pill.low) { border-left-color: var(--low); }
+.main .finding:has(.pill.info) { border-left-color: var(--info); }
+.main .finding:hover { background: var(--surface-2); }
+
+/* Release legacy page width caps without constraining individual form fields. */
+.main .admin-layout, .main .wizard, .main .chat { width: 100%; max-width: none; }
+@media (max-width: 1100px) {
+  .main .split { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 900px) {
+  .app .side { width: min(280px, 84vw); z-index: 20; }
+  .app .side.open { box-shadow: none; }
+  .app .side-backdrop { display: block; position: fixed; inset: 0; z-index: 19; border: 0; border-radius: 0; background: rgba(0, 0, 0, 0.5); cursor: pointer; }
+  .app .side-close { display: inline-flex; margin-left: auto; }
+  .app .btn.menu-btn { display: inline-flex; }
+  .app .main { padding: 14px max(12px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+}
+@media (max-width: 640px) {
+  .main .page-head { align-items: flex-start; }
+  .main .page-head > :first-child { flex-basis: 100%; }
+  .main .filterbar > input:not([type='checkbox']):not([type='radio']), .main .filterbar > select { flex: 1 1 100%; width: 100%; }
+  .main .sect { padding: 12px; }
+  .main .sect > header { margin: -12px -12px 12px; }
+  .main .table-wrap thead th:first-child { z-index: 3; background: var(--surface-2); }
+  .main .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 380px) { .main .kpi-row { grid-template-columns: minmax(0, 1fr); } }

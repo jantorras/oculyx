@@ -4,7 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { api } from '../lib';
 import { useT } from '../i18n';
-import { Modal } from './ui';
+import { WorkspaceModal } from './overlay';
 
 /** A real SSH shell on the host, tunnelled through the server (which holds the key) into the browser. */
 export function TerminalModal({ agentId, name, onClose }: { agentId: number; name: string; onClose: () => void }) {
@@ -78,11 +78,11 @@ export function TerminalModal({ agentId, name, onClose }: { agentId: number; nam
   }, [agentId]);
 
   return (
-    <Modal wide title={`${t('ssh.terminal')} · ${name}`} onClose={onClose}>
+    <WorkspaceModal title={`${t('ssh.terminal')} · ${name}`} onClose={onClose}>
       {error && <div className="error" role="alert">{t(`err.${error}`) === `err.${error}` ? error : t(`err.${error}`)}</div>}
       {fp?.first && <div className="warn">{t('ssh.hostkey_pinned', { key: fp.key })}</div>}
-      <div ref={box} style={{ height: 'min(60dvh, 520px)', background: '#0b0e13', borderRadius: 8, padding: 8, overflow: 'hidden' }} aria-label={t('ssh.terminal')} />
+      <div ref={box} style={{ flex: 1, minHeight: 0, width: '100%', background: '#0b0e13', borderRadius: 2, padding: 8, overflow: 'hidden' }} aria-label={t('ssh.terminal')} />
       <div className="muted" style={{ fontSize: 12 }}>{status === 'connecting' ? t('ssh.connecting') : status === 'open' ? t('ssh.logged') : t('ssh.closed')}</div>
-    </Modal>
+    </WorkspaceModal>
   );
 }

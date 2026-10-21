@@ -1,4 +1,5 @@
 export const en: Record<string, string> = {
+  'nav.group.monitoring': 'Monitoring', 'nav.group.security': 'Security', 'nav.group.alerts': 'Alerts', 'nav.group.tools': 'Tools', 'nav.group.administration': 'Administration',
   'common.loading': 'Loading…', 'common.save': 'Save', 'common.saved': 'Saved', 'common.add': 'Add', 'common.delete': 'Delete', 'common.close': 'Close',
   'common.copy': 'Copy command', 'common.search': 'Search…', 'common.view_all': 'View all', 'common.actions': 'Actions',
   'auth.title': 'Sign in', 'auth.subtitle': 'Monitor, secure and manage your servers.', 'auth.username': 'Username', 'auth.password': 'Password', 'auth.login': 'Sign in', 'auth.logout': 'Sign out',

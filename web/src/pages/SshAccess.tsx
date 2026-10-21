@@ -1,7 +1,8 @@
+import { Section } from '../components/overlay';
 import { useState } from 'react';
 import { api, usePoll, clock } from '../lib';
 import { useT } from '../i18n';
-import { Card, Empty } from '../components/ui';
+import { Empty } from '../components/ui';
 import { TerminalModal } from '../components/Terminal';
 import { ask } from '../components/overlay';
 
@@ -75,10 +76,10 @@ export function SshAccess({ agentId, name, onGoSecurity }: { agentId: number; na
   const canChange = data.canHarden === true;
 
   const step = (n: number, done: boolean, title: string, why: string, body: React.ReactNode) => (
-    <div className="row" style={{ gap: 14, alignItems: 'flex-start', padding: '14px 0', borderTop: n > 1 ? '1px solid var(--line)' : 0 }}>
+    <div className="row" style={{ gap: 14, alignItems: 'flex-start', padding: '14px 0', borderTop: '1px solid var(--line)' }}>
       <span style={{ width: 24, height: 24, borderRadius: 99, display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 650, flex: 'none', background: done ? 'var(--ok)' : 'var(--surface-2)', color: done ? '#04130d' : 'var(--muted)', border: '1px solid var(--line-strong)' }}>{done ? '✓' : n}</span>
       <div className="grow" style={{ minWidth: 0 }}>
-        <div style={{ fontWeight: 600 }}>{title}</div>
+        <div className="sect-title">{title}</div>
         <div className="muted" style={{ fontSize: 13, margin: '3px 0 10px', maxWidth: '70ch' }}>{why}</div>
         {body}
       </div>
@@ -86,10 +87,11 @@ export function SshAccess({ agentId, name, onGoSecurity }: { agentId: number; na
   );
 
   return (
-    <div className="grid" style={{ maxWidth: 960 }}>
-      <Card title={t('sshw.title')}>
+    <div className="grid">
+      <Section title={t('sshw.title')}>
         <p className="muted" style={{ marginTop: 0, fontSize: 13.5 }}>{t('sshw.intro')}</p>
         {!canChange && <div className="warn" style={{ marginBottom: 8 }}>{t('sshw.readonly')}</div>}
+        <div className="grid g2" style={{ alignItems: 'start' }}>
         {step(1, !!key, t('sshw.s1'), t('sshw.s1_why'), key ? <span className="pill">{t('sshw.s1_done', { name: key.name })}</span> : (
           <div className="row wrap" style={{ gap: 8 }}>
             <button className="btn primary" disabled={!!busy || !f.host} onClick={createKey}>{t('sshw.s1_btn_create')}</button>
@@ -132,13 +134,14 @@ export function SshAccess({ agentId, name, onGoSecurity }: { agentId: number; na
             <div className="muted" style={{ fontSize: 12.5 }}>{t('sshw.root_why')}</div>
           </div>
         ))}
+        </div>
         {pwOff && <div role="status" style={{ color: 'var(--ok)', marginTop: 6 }}>{t('sshw.locked')}</div>}
         {msg && <div className={msg.ok ? '' : 'error'} role={msg.ok ? 'status' : 'alert'} style={{ marginTop: 10, color: msg.ok ? 'var(--ok)' : undefined }}>{msg.text}</div>}
-      </Card>
+      </Section>
 
       <details open={!acc.host}>
         <summary className="muted" style={{ cursor: 'pointer', marginBottom: 10 }}>{t('sshw.advanced')}</summary>
-        <Card title={t('ssh.connection')}>
+        <Section title={t('ssh.connection')}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 12, alignItems: 'end' }}>
             <label className="field">{t('ssh.host')}<input value={f.host} onChange={(e) => setForm({ ...f, host: e.target.value })} placeholder="192.168.1.20" spellCheck={false} /></label>
             <label className="field">{t('ssh.port')}<input type="number" min={1} max={65535} value={f.port} onChange={(e) => setForm({ ...f, port: e.target.value })} /></label>
@@ -154,17 +157,17 @@ export function SshAccess({ agentId, name, onGoSecurity }: { agentId: number; na
           <div className="row" style={{ gap: 8, marginTop: 12 }}>
             <button className="btn primary" disabled={!!busy || !form} onClick={save}>{t('common.save')}</button>
           </div>
-        </Card>
+        </Section>
       </details>
 
-      <Card title={t('ssh.authorized')} flush actions={data.canHarden && key && users.length > 0 ? (
+      <Section title={t('ssh.authorized')} flush actions={data.canHarden && key && users.length > 0 ? (
         <div className="row" style={{ gap: 6 }}>
           <select value={du} onChange={(e) => setDeployUser(e.target.value)} aria-label={t('ssh.user')}>{users.map((u) => <option key={u}>{u}</option>)}</select>
           <button className="btn sm primary" disabled={!!busy} onClick={() => run('deploy', async () => { const r = await api<any>(`/agents/${agentId}/ssh/deploy`, { body: { keyId: key.id, user: du } }); return r.steps?.join(' · '); })}>{t('ssh.deploy')}</button>
         </div>
       ) : undefined}>
         {data.hostKeysError ? <Empty>{data.hostKeysError}</Empty> : hostKeys.length === 0 ? <Empty>{t('ssh.no_authorized')}</Empty> : (
-          <div className="table-wrap"><table>
+          <div className="table-wrap"><table className="tbl-dense">
             <thead><tr><th>{t('ssh.user')}</th><th>{t('ssh.fingerprint')}</th><th>{t('ssh.comment')}</th><th /></tr></thead>
             <tbody>{hostKeys.map((k, i) => (
               <tr key={i}>
@@ -176,12 +179,12 @@ export function SshAccess({ agentId, name, onGoSecurity }: { agentId: number; na
             ))}</tbody>
           </table></div>
         )}
-      </Card>
+      </Section>
       {!data.canHarden && key && (
-        <Card title={t('ssh.manual_title')}>
+        <Section title={t('ssh.manual_title')}>
           <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>{t('ssh.manual_help')}</p>
           <pre className="mono" style={{ margin: 0, padding: 10, background: 'var(--surface-2)', borderRadius: 8, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{`mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '${key.public}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys`}</pre>
-        </Card>
+        </Section>
       )}
       {acc.tested && <p className="muted" style={{ fontSize: 12 }}>{t('ssh.last_test')}: {clock(acc.tested)}</p>}
       {term && <TerminalModal agentId={agentId} name={name} onClose={() => setTerm(false)} />}

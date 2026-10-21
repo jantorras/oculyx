@@ -1,7 +1,8 @@
+import { Section } from '../components/overlay';
 import { useState } from 'react';
 import { api, usePoll } from '../lib';
 import { useT } from '../i18n';
-import { Card } from '../components/ui';
+
 import { toast } from '../components/overlay';
 
 /** Settings, AI: provider, budget and where the assistant is used. The API key is write-only. */
@@ -72,8 +73,8 @@ export function AiSettings() {
   );
 
   return (
-    <div className="grid" style={{ maxWidth: 760 }}>
-      <Card title={t('aiset.provider')}>
+    <div className="grid g2">
+      <Section title={t('aiset.provider')}>
         <div className="grid" style={{ gap: 14 }}>
           {toggle('enabled', t('aiset.enable'), t('aiset.enable_hint'))}
           <div className="grid g2">
@@ -104,9 +105,9 @@ export function AiSettings() {
             {testMsg && <span className={testMsg.ok ? 'muted' : 'error'} role={testMsg.ok ? 'status' : 'alert'}>{testMsg.ok ? `${t('aiset.works')}: ${testMsg.text}` : testMsg.text}</span>}
           </div>
         </div>
-      </Card>
+      </Section>
 
-      <Card title={t('aiset.cost')}>
+      <Section title={t('aiset.cost')}>
         <p className="muted small" style={{ marginTop: 0 }}>{t('aiset.cost_help')}</p>
         <div className="grid g3">
           <label className="field">{t('aiset.price_in')}<input type="number" min={0} step="0.01" value={v('priceIn')} onChange={(e) => set('priceIn', e.target.value)} /></label>
@@ -117,19 +118,19 @@ export function AiSettings() {
           <div className="row spread small"><span>{t('aiset.this_month')}</span><span className="num">{u.cost.toFixed(3)}{cap ? ` / ${cap}` : ''}  ·  {u.calls} {t('aiset.calls')}  ·  {Math.round((u.inTokens + u.outTokens) / 1000)}k tokens</span></div>
           {cap && <div className="bar" style={{ marginTop: 6 }}><i style={{ width: `${pct}%`, background: pct > 85 ? 'var(--bad)' : 'var(--accent)' }} /></div>}
         </div>
-      </Card>
+      </Section>
 
-      <Card title={t('aiset.where')}>
-        <div className="grid" style={{ gap: 12 }}>
+      <Section title={t('aiset.where')} fullWidth>
+        <div className="grid g2" style={{ gap: 12 }}>
           {toggle('alerts', t('aiset.alerts'), t('aiset.alerts_hint'))}
-          <label className="field" style={{ maxWidth: 300 }}>{t('aiset.alert_min')}
+          <label className="field">{t('aiset.alert_min')}
             <select value={v('alertMinSeverity')} onChange={(e) => set('alertMinSeverity', e.target.value)}>
               {['critical', 'high', 'medium'].map((s) => <option key={s} value={s}>{t(`sev.${s}`)}</option>)}
             </select>
           </label>
           {toggle('telegram', t('aiset.telegram'), data.telegramConfigured ? t('aiset.telegram_hint') : t('aiset.telegram_need'), !data.telegramConfigured)}
           <div className="row wrap" style={{ gap: 10, alignItems: 'end' }}>
-            <label className="field" style={{ minWidth: 220 }}>{t('aiset.digest')}
+            <label className="field">{t('aiset.digest')}
               <select value={v('digestHour') ?? ''} onChange={(e) => set('digestHour', e.target.value)}>
                 <option value="">{t('aiset.digest_off')}</option>
                 {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
@@ -137,16 +138,16 @@ export function AiSettings() {
             </label>
             <button className="btn" disabled={!!busy} onClick={digestNow}>{t('aiset.digest_now')}</button>
           </div>
-          <label className="field" style={{ maxWidth: 220 }}>{t('aiset.language')}
+          <label className="field">{t('aiset.language')}
             <select value={v('language')} onChange={(e) => set('language', e.target.value)}>
               <option value="ca">Català</option><option value="es">Español</option><option value="en">English</option>
             </select>
           </label>
         </div>
-      </Card>
+      </Section>
 
-      <div className="notice">{t('aiset.privacy')}</div>
-      <div className="row"><button className="btn primary" disabled={!dirty || !!busy} onClick={save}>{t('common.save')}</button></div>
+      <div className="notice" style={{ gridColumn: '1 / -1' }}>{t('aiset.privacy')}</div>
+      <div className="row" style={{ gridColumn: '1 / -1' }}><button className="btn primary" disabled={!dirty || !!busy} onClick={save}>{t('common.save')}</button></div>
     </div>
   );
 }

@@ -54,8 +54,8 @@ export function Assistant() {
   const notReady = status && !status.ready;
 
   return (
-    <div className="chat">
-      <div className="topbar">
+    <div className="page" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 12 }}>
+      <div className="page-head">
         <div className="grow">
           <h1>{t('nav.assistant')}</h1>
           <div className="sub">{t('ai.subtitle')}</div>
@@ -69,7 +69,7 @@ export function Assistant() {
         </div>
       )}
 
-      <div className="chat-log" aria-live="polite">
+      <div className="chat-log sect" role="log" aria-live="polite" style={{ flex: 1, minHeight: 0, overflow: 'auto', overflowWrap: 'anywhere' }}>
         {turns.length === 0 && (
           <div className="chat-empty">
             <p className="muted">{t('ai.intro')}</p>
@@ -98,7 +98,7 @@ export function Assistant() {
         <div ref={end} />
       </div>
 
-      <form className="chat-input" onSubmit={(e) => { e.preventDefault(); void send(text); }}>
+      <form className="chat-input filterbar" style={{ position: 'static', flexShrink: 0 }} onSubmit={(e) => { e.preventDefault(); void send(text); }}>
         <textarea value={text} rows={1} placeholder={t('ai.placeholder')} aria-label={t('ai.placeholder')} maxLength={1500} disabled={!!notReady}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(text); } }} />

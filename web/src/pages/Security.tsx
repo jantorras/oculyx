@@ -18,19 +18,14 @@ export function Security() {
   const rows = sev === 'all' ? data : data.filter((f) => f.severity === sev);
 
   return (
-    <>
-      <div className="topbar">
+    <div className="page">
+      <div className="page-head">
         <div className="grow">
           <h1>{t('nav.security')}</h1>
           <div className="sub">{t('security.subtitle')}</div>
         </div>
-        <div className="seg">
-          {['open', 'ignored', 'resolved'].map((s) => (
-            <button key={s} className={status === s ? 'active' : ''} onClick={() => setStatus(s)}>{t(`security.status_${s}`)}</button>
-          ))}
-        </div>
       </div>
-      <div className="grid g4" style={{ gridTemplateColumns: 'repeat(4, minmax(0,1fr))', marginBottom: 16 }}>
+      <div className="kpi-row">
         {(['critical', 'high', 'medium', 'low'] as const).map((s) => (
           <button key={s} onClick={() => setSev(sev === s ? 'all' : s)} style={{ all: 'unset', cursor: 'pointer', display: 'block' }} aria-pressed={sev === s}>
             <div style={sev === s ? { borderRadius: 12, boxShadow: `0 0 0 1.5px var(--${s === 'medium' ? 'med' : s})` } : undefined}>
@@ -53,10 +48,24 @@ export function Security() {
           </Card>
         </div>
       )}
-      <Card flush>
+      <section className="sect">
+        <h2 className="sect-title">{t('overview.findings_caption')} <span className="muted num">({rows.length})</span></h2>
+        <div className="filterbar" role="search">
+          <div className="seg" role="tablist" aria-label={t('nav.security')}>
+            {['open', 'ignored', 'resolved'].map((s) => (
+              <button key={s} role="tab" aria-selected={status === s} className={status === s ? 'active' : ''} onClick={() => setStatus(s)}>{t(`security.status_${s}`)}</button>
+            ))}
+          </div>
+          <label className="row" style={{ gap: 8 }}>{t('security.severity')}
+            <select value={sev} onChange={(e) => setSev(e.target.value)}>
+              <option value="all">{t('alerts.all_sev')}</option>
+              {SEVERITIES.map((s) => <option key={s} value={s}>{t(`sev.${s}`)}</option>)}
+            </select>
+          </label>
+        </div>
         <FindingList rows={rows} showHost onChange={refresh} />
-      </Card>
-    </>
+      </section>
+    </div>
   );
 }
 
@@ -87,26 +96,33 @@ export function FindingList({ rows, showHost, onChange }: { rows: any[]; showHos
   };
   return (
     <>
-      {rows.map((f) => (
-        <div key={f.id} className={`finding ${f.status === 'ignored' ? 'ignored' : ''}`}>
-          <SevPill sev={f.severity} />
-          <div className="t">{f.title}</div>
-          <div className="row" style={{ gap: 6 }}>
+      <div className="table-wrap">
+      <table className="rows tbl-dense">
+        <thead><tr><th>{t('security.severity')}</th><th>{t('overview.findings_caption')}</th>{showHost && <th>{t('pol.host')}</th>}<th>{t('security.first_seen')}</th><th>{t('common.actions')}</th></tr></thead>
+        <tbody>
+        {rows.map((f) => (
+        <tr key={f.id} className={f.status === 'ignored' ? 'ignored' : ''} data-severity={f.severity} style={{ ['--row-severity' as string]: SEV_COLOR[f.severity] }}>
+          <td><SevPill sev={f.severity} /></td>
+          <td><b>{f.title}</b>
+            {f.detail && <div className="muted small" style={{ overflowWrap: 'anywhere' }}>{f.detail}</div>}
+            <span className="mono muted small">{f.check_id}</span>
+          </td>
+          {showHost && <td><a href={`#/hosts/${f.agent_id}/security`}>{f.agent}</a></td>}
+          <td className="muted num">{ago(f.first_seen)}</td>
+          <td><div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
             {canOperate(user) && f.status === 'open' && <button className="btn sm" onClick={() => act(f.id, 'ignore')}>{t('security.ignore')}</button>}
             {canOperate(user) && f.status === 'ignored' && <button className="btn sm" onClick={() => act(f.id, 'reopen')}>{t('security.reopen')}</button>}
-          </div>
-          {f.detail && <div className="d">{f.detail}</div>}
           {f.fix && f.status === 'open' && user.role === 'admin' && (
             f.can_harden
-              ? <button className="btn sm primary fixbtn" style={{ gridRow: 2 }} onClick={() => setFixing({ agent: f.agent_id, fix: f.fix })}>{t('fix.button')}</button>
-              : <span className="muted" style={{ gridColumn: 3, gridRow: 2, fontSize: 12 }} title={t('fix.unavailable_hint')}>{t('fix.unavailable')}</span>
+              ? <button className="btn sm primary" onClick={() => setFixing({ agent: f.agent_id, fix: f.fix })}>{t('fix.button')}</button>
+              : <span className="muted small" title={t('fix.unavailable_hint')}>{t('fix.unavailable')}</span>
           )}
-          <div className="m">
-            {showHost && <><a href={`#/hosts/${f.agent_id}/security`} style={{ color: 'var(--accent)' }}>{f.agent}</a> · </>}
-            <span className="mono">{f.check_id}</span> · {t('security.first_seen')} {ago(f.first_seen)}
-          </div>
-        </div>
+          </div></td>
+        </tr>
       ))}
+        </tbody>
+      </table>
+      </div>
       {fixing && <FixDialog agentId={fixing.agent} fix={fixing.fix} onClose={() => setFixing(null)} onDone={onChange} />}
     </>
   );
