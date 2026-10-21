@@ -137,6 +137,10 @@ The server runs `cloudflared` itself and shows the tunnel status. Generated agen
 
 **Detection** works from the auth log or the journal (Debian 12 has no `auth.log`), `/proc`, and file baselines kept by the agent. Keys you deploy from the panel are not reported as intruders; keys added behind its back are. The first 24 hours of logins only teach the panel what is normal.
 
+## Alert policies
+
+*Alert policies* decide what each server alerts about, the way Zabbix templates and Wazuh agent groups do. Reusable **profiles** (Production, Bastion, Database, Docker host, Dev and test are included) set limits, how many readings in a row confirm a problem, the minimum severity that notifies, and which detection rules are on and at what severity. Each host can then add its own **exceptions**; anything left empty is inherited (global settings, then profile, then host). **Maintenance windows** silence a host for a while, and critical alerts can still break through.
+
 ## AI assistant (optional)
 
 Turn it on under *Settings, AI*. Bring your own provider: **Claude** (the small, cheap model is the default), **OpenAI or any compatible API** (OpenRouter, Groq, Gemini...) or **Ollama** on your own network for zero cost and full privacy.

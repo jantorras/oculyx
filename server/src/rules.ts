@@ -100,7 +100,7 @@ export class RuleEngine {
     const now = Date.now();
     for (const r of RULES) {
       if (r.event !== ev.type) continue;
-      const cfg = ruleConfig(this.db, r);
+      const cfg = this.alerts.policies.of(agentId).effective.rules[r.id];
       // new_source must keep learning even when its alerts are switched off
       let hit = false;
       try {
@@ -110,7 +110,7 @@ export class RuleEngine {
       }
       if (!cfg.enabled || !hit) continue;
       if (ev.severity === 'info' && ev.type !== 'ssh_login') continue; // e.g. package-managed file changes
-      const severity = this.db.setting(`rule.${r.id}.severity`) ? cfg.severity : (ORDER.includes(ev.severity as Sev) && sevRank(ev.severity) > sevRank(cfg.severity) ? (ev.severity as Sev) : cfg.severity);
+      const severity = cfg.severitySet ? cfg.severity : (ORDER.includes(ev.severity as Sev) && sevRank(ev.severity) > sevRank(cfg.severity) ? (ev.severity as Sev) : cfg.severity);
       this.alerts.raiseEvent(agentId, r.id, severity, ev.message, `${ev.data.user ?? ''}|${ev.data.ip ?? ev.data.file ?? ev.data.pid ?? ev.data.port ?? ev.data.module ?? ev.message}`);
     }
   }

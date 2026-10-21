@@ -11,6 +11,8 @@ import { notify } from './notify.ts';
 import { Ai, AiError, providerDefaults } from './ai.ts';
 import { TelegramBot } from './telegram.ts';
 import { alertCatalog } from './alertinfo.ts';
+import { Policies } from './policy.ts';
+import { registerPolicyRoutes } from './policy-routes.ts';
 import { Tunnel, validTunnelToken, validHostname } from './tunnel.ts';
 import { RULES, ruleConfig } from './rules.ts';
 import { KeyVault, generateKey, importKey, connect, exec, shell, loadAccess, SshError } from './ssh.ts';
@@ -29,7 +31,8 @@ const SESSION_MS = 12 * 3600_000;
 
 const db = new Db(join(DATA_DIR, 'oculyx.db'));
 const secret = loadSecret(DATA_DIR);
-const alerts = new Alerts(db);
+const policies = new Policies(db);
+const alerts = new Alerts(db, policies);
 const hub = new Hub(db, alerts);
 const limiter = new LoginLimiter();
 const tunnel = new Tunnel(db);
@@ -848,6 +851,8 @@ app.put('/api/rules', admin, async (req, reply) => {
   audit(req.user!.username, 'rules.update', undefined, req.ip);
   return { ok: true };
 });
+
+registerPolicyRoutes(app, { db, policies, admin, audit });
 
 // ---------- Cloudflare Tunnel (domain access configured from the web UI) ----------
 const tunnelInfo = () => ({

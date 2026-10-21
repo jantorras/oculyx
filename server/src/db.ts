@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS events_idx ON events(agent_id, ts);
 CREATE TABLE IF NOT EXISTS ai_usage (month TEXT PRIMARY KEY, in_tokens INTEGER NOT NULL DEFAULT 0, out_tokens INTEGER NOT NULL DEFAULT 0, cost REAL NOT NULL DEFAULT 0, calls INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, description TEXT NOT NULL DEFAULT '', config TEXT NOT NULL DEFAULT '{}', created INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS audit (
   id INTEGER PRIMARY KEY, ts INTEGER NOT NULL, user TEXT, action TEXT NOT NULL, target TEXT, ip TEXT
 );
@@ -60,7 +61,7 @@ export class Db {
     this.raw = new DatabaseSync(path);
     this.raw.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=ON;');
     this.raw.exec(SCHEMA);
-    for (const alter of ['ALTER TABLE enroll_tokens ADD COLUMN expires INTEGER', 'ALTER TABLE findings ADD COLUMN fix TEXT']) {
+    for (const alter of ['ALTER TABLE enroll_tokens ADD COLUMN expires INTEGER', 'ALTER TABLE findings ADD COLUMN fix TEXT', 'ALTER TABLE agents ADD COLUMN profile_id INTEGER', 'ALTER TABLE agents ADD COLUMN overrides TEXT', 'ALTER TABLE agents ADD COLUMN muted_until INTEGER', 'ALTER TABLE agents ADD COLUMN muted_reason TEXT']) {
       try {
         this.raw.exec(alter);
       } catch {

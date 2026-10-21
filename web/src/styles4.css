@@ -222,3 +222,33 @@ table.rows td.act { text-align: right; white-space: nowrap; width: 1%; }
 .alert-info p.todo { margin-top: 4px; color: var(--text); }
 .alert-info.compact { background: none; border: 0; padding: 0; margin: 2px 0 0; }
 .alert-info.compact p { font-size: 12px; }
+
+/* ---------- alert policies ---------- */
+.pol-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 20px; align-items: start; }
+.pol-list { display: grid; gap: 4px; position: sticky; top: 16px; }
+.pol-item { display: grid; gap: 1px; text-align: left; padding: 9px 12px; border-radius: 8px; border: 1px solid transparent; background: none; color: var(--text); cursor: pointer; }
+.pol-item:hover { background: var(--surface-2); }
+.pol-item.active { background: var(--surface-2); border-color: var(--line-strong); }
+.pol-item.new { color: var(--accent); font-weight: 500; }
+.pol-hosts { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 14px; max-height: 240px; overflow: auto; }
+.pol-host { display: flex; align-items: center; gap: 8px; padding: 4px 2px; cursor: pointer; }
+.sec-title { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--text); }
+.pol-limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+.pol-rules { display: grid; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.pol-rule { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.pol-rule:first-child { border-top: 0; }
+.pol-rule.changed { background: color-mix(in srgb, var(--accent) 6%, transparent); box-shadow: inset 2px 0 0 var(--accent); }
+.pol-rule.off .t { color: var(--muted); }
+.pol-rule select { width: 150px; flex: none; }
+.pol-rule .t { font-weight: 500; font-size: 13.5px; }
+@media (max-width: 860px) {
+  .pol-layout { grid-template-columns: 1fr; }
+  .pol-list { position: static; grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; }
+  .pol-rule { flex-wrap: wrap; }
+  .pol-rule .grow { flex-basis: 100%; }
+  .pol-rule select { flex: 1; width: auto; }
+}
+.pol-host { justify-content: flex-start; text-align: left; }
+.pol-host input[type=checkbox], table.rows input[type=checkbox] { width: auto; min-height: 0; flex: none; padding: 0; }
+.pol-host span { white-space: nowrap; }
+.pol-host span.muted { white-space: normal; }
