@@ -451,6 +451,28 @@ app.post('/api/agents/update', admin, async (req, reply) => {
   for (const raw of ids) {
     const id = Number(raw);
     try {
+      const row = db.get('SELECT name, info FROM agents WHERE id=?', id);
+      const info = row ? JSON.parse(row.info ?? 'null') : null;
+      if (!row) throw new Error('not_found');
+      if (!(info?.canHarden && hub.isOnline(id))) {
+        // The agent cannot update itself (read-only, or too old). If the panel can SSH in, do it that way and keep the agent's mode.
+        const access = loadAccess(db, id);
+        if (!access?.key_id || info?.mode !== 'native') throw new Error('manual');
+        const server = safeServerUrl(db.setting('server.public_url'), safeServerUrl(originOf(req), 'http://localhost:' + PORT));
+        if (!/^https?:\/\/[A-Za-z0-9.:\[\]-]+$/.test(server) || !/^[\w .@()-]{1,64}$/.test(row.name)) throw new Error('manual');
+        const s = await sshSession(id);
+        try {
+          const args = `--native${info.actions ? ' --allow-actions' : ''} --server '${server}' --name '${row.name.replaceAll("'", '')}'`;
+          const inner = `curl -fsSL --max-time 30 '${server}/install.sh' | bash -s -- ${args}`;
+          const out = await exec(s.client, `if [ "$(id -u)" = 0 ]; then S=; else S='sudo -n'; fi; $S systemd-run --collect --quiet --unit oculyx-agent-update-$(date +%s) -- /bin/bash -c "${inner.replaceAll('"', '\\"')}" 2>&1 && echo STARTED`);
+          if (!out.includes('STARTED')) throw new Error(out.slice(0, 160) || 'ssh_update_failed');
+        } finally {
+          s.client.end();
+        }
+        audit(req.user!.username, 'agent.update.ssh', String(id), req.ip);
+        results.push({ id, ok: true });
+        continue;
+      }
       await hub.command(id, 'agent.update', {}, 30_000);
       audit(req.user!.username, 'agent.update', String(id), req.ip);
       results.push({ id, ok: true });

@@ -41,6 +41,11 @@ export function Servers() {
     try {
       const r = await api<{ results: { id: number; ok: boolean; error?: string }[] }>('/agents/update', { body: { ids } });
       const bad = r.results.filter((x) => !x.ok);
+      const manualOne = bad.find((b) => b.error === 'manual');
+      if (manualOne && r.results.length === 1) {
+        setManual(data.agents.find((a) => a.id === manualOne.id) ?? null);
+        return;
+      }
       setMsg(`${t('servers.update_started', { n: r.results.length - bad.length })}${bad.length ? ' ' + bad.map((b) => `${names.get(b.id)}: ${b.error}`).join(' · ') : ''}`);
       refresh();
     } catch (e) {
@@ -132,7 +137,7 @@ export function Servers() {
                         <div className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
                           {a.outdated && (a.online && a.info?.canHarden
                             ? <button className="btn sm primary" disabled={busy} onClick={() => update([a.id])}>{t('servers.update')}</button>
-                            : <button className="btn sm" onClick={() => setManual(a)}>{t('servers.update')}</button>)}
+                            : <button className="btn sm primary" disabled={busy} onClick={() => update([a.id])}>{t('servers.update')}</button>)}
                           <Menu label={t('adm.more')} items={[
                             { label: t('servers.open'), onClick: () => { location.hash = `/hosts/${a.id}`; } },
                             { label: t('servers.rename'), onClick: () => setRename({ id: a.id, name: a.name }) },

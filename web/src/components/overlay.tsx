@@ -60,22 +60,35 @@ export type MenuItem = { label: string; onClick: () => void; danger?: boolean; d
 
 export function Menu({ items, label }: { items: MenuItem[]; label: string }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  // the popup is fixed to the viewport so scrolling table containers cannot clip it
+  const toggle = () => {
+    if (!open) {
+      const r = ref.current?.getBoundingClientRect();
+      if (r) setPos(r.bottom + 260 > window.innerHeight && r.top > 260 ? { bottom: window.innerHeight - r.top + 4, right: window.innerWidth - r.right } : { top: r.bottom + 4, right: window.innerWidth - r.right });
+    }
+    setOpen(!open);
+  };
   useEffect(() => {
     if (!open) return;
+    const t0 = Date.now();
+    const close = () => Date.now() - t0 > 300 && setOpen(false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
     const away = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
     document.addEventListener('mousedown', away);
     document.addEventListener('keydown', esc);
-    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc); };
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc); window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close); };
   }, [open]);
   return (
     <div className="menu" ref={ref}>
-      <button className="btn ghost sm icon" aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button className="btn ghost sm icon" aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>
       </button>
       {open && (
-        <div className="menu-pop" role="menu">
+        <div className="menu-pop" role="menu" style={{ position: 'fixed', top: pos?.top ?? 'auto', bottom: pos?.bottom ?? 'auto', right: pos?.right, left: 'auto' }}>
           {items.map((it, i) => it === 'sep'
             ? <hr key={i} />
             : <button key={i} role="menuitem" className={it.danger ? 'danger' : ''} disabled={it.disabled} onClick={() => { setOpen(false); it.onClick(); }}>
