@@ -130,13 +130,19 @@ export class Connection {
           this.p.tick?.();
           const events = this.p.drainEvents();
           if (events.length) this.send({ t: 'events', events });
+          for (const m of this.p.drainMessages?.() ?? []) this.send(m);
         });
       });
       ws.on('message', async (raw) => {
         const m = JSON.parse(raw.toString());
+        if (m.t === 'config') {
+          this.p.configure?.(m.checks);
+          return;
+        }
         if (m.t !== 'cmd') return;
         try {
           this.send({ t: 'result', id: m.id, ok: true, data: await this.p.command(m.action, m.args ?? {}) });
+          if (m.action === 'checks.run') setTimeout(() => { for (const x of this.p.drainMessages?.() ?? []) this.send(x); const events = this.p.drainEvents(); if (events.length) this.send({ t: 'events', events }); }, 300);
           if (m.action.startsWith('docker.') || m.action.startsWith('fim.') || m.action.startsWith('harden.') || m.action.startsWith('ssh.')) setTimeout(() => this.refreshSoon(), 500);
         } catch (e) {
           this.send({ t: 'result', id: m.id, ok: false, error: (e as Error).message });

@@ -83,5 +83,9 @@ export interface Provider {
   drainEvents(): AgentEvent[];
   /** called every few seconds for continuous collectors (log tailing, intrusion watchers) */
   tick?(): void;
+  /** the server pushes which optional checks to run (see checks.ts) */
+  configure?(checks: unknown): void;
+  /** results of scheduled checks that are not events (configuration audit, inventory) */
+  drainMessages?(): unknown[];
   command(action: string, args: Record<string, any>): Promise<unknown>;
 }

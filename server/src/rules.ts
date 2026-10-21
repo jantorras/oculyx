@@ -51,6 +51,11 @@ export const RULES: RuleDef[] = [
   { id: 'cryptominer', event: 'cryptominer', group: 'processes', severity: 'critical', enabled: true },
   { id: 'suspicious_process', event: 'suspicious_process', group: 'processes', severity: 'high', enabled: true },
   { id: 'unknown_kernel_module', event: 'unknown_kernel_module', group: 'processes', severity: 'high', enabled: true },
+  { id: 'fim_custom', event: 'fim_custom', group: 'persistence', severity: 'high', enabled: true },
+  { id: 'log_match', event: 'log_match', group: 'system', severity: 'medium', enabled: true },
+  { id: 'sca_regression', event: 'sca_regression', group: 'system', severity: 'medium', enabled: true },
+  { id: 'vuln_found', event: 'vuln', group: 'system', severity: 'high', enabled: true },
+  { id: 'inventory_changed', event: 'inventory_changed', group: 'system', severity: 'low', enabled: false },
   { id: 'port_opened', event: 'port_opened', group: 'system', severity: 'medium', enabled: true },
   { id: 'rdp_failed', event: 'rdp_failed', group: 'access', severity: 'medium', enabled: true },
   { id: 'win_admin_change', event: 'win_admin_change', group: 'accounts', severity: 'high', enabled: true },
@@ -111,7 +116,7 @@ export class RuleEngine {
       if (!cfg.enabled || !hit) continue;
       if (ev.severity === 'info' && ev.type !== 'ssh_login') continue; // e.g. package-managed file changes
       const severity = cfg.severitySet ? cfg.severity : (ORDER.includes(ev.severity as Sev) && sevRank(ev.severity) > sevRank(cfg.severity) ? (ev.severity as Sev) : cfg.severity);
-      this.alerts.raiseEvent(agentId, r.id, severity, ev.message, `${ev.data.user ?? ''}|${ev.data.ip ?? ev.data.file ?? ev.data.pid ?? ev.data.port ?? ev.data.module ?? ev.message}`);
+      this.alerts.raiseEvent(agentId, r.id, severity, ev.message, `${ev.data.user ?? ''}|${ev.data.key ?? ev.data.ip ?? ev.data.file ?? ev.data.pid ?? ev.data.port ?? ev.data.module ?? ev.message}`);
     }
   }
 }

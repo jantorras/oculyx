@@ -390,5 +390,75 @@
    "meaning": "Ha canviat la pertinença al grup Administradors en un host Windows.",
    "todo": "Comprova que va ser un canvi previst. Si no, treu el compte i revisa els inicis de sessió recents."
   }
+ },
+ "fim_custom": {
+  "en": {
+   "meaning": "A file or folder you chose to watch changed: a file was modified, added or removed.",
+   "todo": "Check it was a deploy or an update you know about. If not, compare with a backup and treat the server as possibly compromised."
+  },
+  "es": {
+   "meaning": "Cambió un archivo o carpeta que elegiste vigilar: se modificó, añadió o eliminó un archivo.",
+   "todo": "Comprueba que fue un despliegue o una actualización conocida. Si no, compáralo con una copia y trata el servidor como posiblemente comprometido."
+  },
+  "ca": {
+   "meaning": "Ha canviat un fitxer o carpeta que vas triar vigilar: s’ha modificat, afegit o eliminat un fitxer.",
+   "todo": "Comprova que va ser un desplegament o una actualització coneguda. Si no, compara’l amb una còpia i tracta el servidor com a possiblement compromès."
+  }
+ },
+ "log_match": {
+  "en": {
+   "meaning": "A log rule you enabled found matching lines (for example web attack patterns or out-of-memory kills).",
+   "todo": "Open the event to read the sample lines. For web attacks, check the source address and block it if it keeps coming."
+  },
+  "es": {
+   "meaning": "Una regla de logs que activaste encontró líneas coincidentes (por ejemplo patrones de ataque web o procesos matados por falta de memoria).",
+   "todo": "Abre el evento para leer las líneas de muestra. En ataques web, mira la dirección de origen y bloquéala si insiste."
+  },
+  "ca": {
+   "meaning": "Una regla de logs que vas activar ha trobat línies coincidents (per exemple patrons d’atac web o processos matats per manca de memòria).",
+   "todo": "Obre l’esdeveniment per llegir les línies d’exemple. En atacs web, mira l’adreça d’origen i bloqueja-la si insisteix."
+  }
+ },
+ "sca_regression": {
+  "en": {
+   "meaning": "A configuration check that used to pass now fails: something was changed to a less safe setting.",
+   "todo": "Open the server in Security checks, find the failed control and follow its fix. If you did not change it, investigate who did."
+  },
+  "es": {
+   "meaning": "Una comprobación de configuración que antes pasaba ahora falla: algo se cambió a un ajuste menos seguro.",
+   "todo": "Abre el servidor en Revisiones de seguridad, busca el control fallido y sigue su solución. Si no lo cambiaste tú, investiga quién fue."
+  },
+  "ca": {
+   "meaning": "Una comprovació de configuració que abans passava ara falla: alguna cosa s’ha canviat a un ajust menys segur.",
+   "todo": "Obre el servidor a Revisions de seguretat, busca el control fallit i segueix-ne la solució. Si no ho has canviat tu, investiga qui ha estat."
+  }
+ },
+ "vuln_found": {
+  "en": {
+   "meaning": "A installed package has a known security vulnerability (high or critical) that attackers can look up.",
+   "todo": "Update the package (Manage tab, Updates). The alert names the version that fixes it."
+  },
+  "es": {
+   "meaning": "Un paquete instalado tiene una vulnerabilidad de seguridad conocida (alta o crítica) que los atacantes pueden consultar.",
+   "todo": "Actualiza el paquete (pestaña Gestiona, Actualizaciones). La alerta indica la versión que lo corrige."
+  },
+  "ca": {
+   "meaning": "Un paquet instal·lat té una vulnerabilitat de seguretat coneguda (alta o crítica) que els atacants poden consultar.",
+   "todo": "Actualitza el paquet (pestanya Gestiona, Actualitzacions). L’alerta indica la versió que ho corregeix."
+  }
+ },
+ "inventory_changed": {
+  "en": {
+   "meaning": "Software was installed or removed, or a service was enabled or disabled.",
+   "todo": "Check it was planned. Unexpected new software or services are a common sign of an intrusion."
+  },
+  "es": {
+   "meaning": "Se instaló o eliminó software, o se activó o desactivó un servicio.",
+   "todo": "Comprueba que estaba previsto. Software o servicios nuevos e inesperados son una señal habitual de intrusión."
+  },
+  "ca": {
+   "meaning": "S’ha instal·lat o eliminat programari, o s’ha activat o desactivat un servei.",
+   "todo": "Comprova que estava previst. Programari o serveis nous i inesperats són un senyal habitual d’intrusió."
+  }
  }
 }

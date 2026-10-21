@@ -2,6 +2,8 @@ import type { WebSocket } from 'ws';
 import type { Db } from './db.ts';
 import type { Alerts } from './alerts.ts';
 import { RuleEngine } from './rules.ts';
+import { Checks } from './checks.ts';
+import type { Policies } from './policy.ts';
 
 interface Pending {
   resolve: (v: any) => void;
@@ -17,10 +19,29 @@ export class Hub {
   private db: Db;
   private alerts: Alerts;
   private rules: RuleEngine;
+  checks: Checks;
   constructor(db: Db, alerts: Alerts) {
     this.db = db;
     this.alerts = alerts;
     this.rules = new RuleEngine(db, alerts);
+    this.checks = new Checks(db, this, (agentId, type, severity, message, data) => {
+      this.db.run('INSERT INTO events(agent_id,ts,type,severity,message,data) VALUES(?,?,?,?,?,?)', agentId, Date.now(), type, severity, message, JSON.stringify(data));
+      this.rules.onEvent(agentId, { type, severity, message, data });
+    });
+  }
+
+  get policies(): Policies {
+    return this.alerts.policies;
+  }
+
+  /** Tells an agent which optional checks to run (its effective policy). */
+  pushChecks(agentId: number) {
+    const ws = this.sockets.get(agentId);
+    if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'config', checks: this.policies.of(agentId).effective.checks }));
+  }
+
+  pushAll() {
+    for (const id of this.sockets.keys()) this.pushChecks(id);
   }
 
   /** Drops a live connection (used when the host is removed so it cannot keep reporting). */
@@ -36,6 +57,7 @@ export class Hub {
   attach(agentId: number, ws: WebSocket, ip: string) {
     this.sockets.get(agentId)?.close(4000, 'replaced');
     this.sockets.set(agentId, ws);
+    this.pushChecks(agentId);
     this.db.run('UPDATE agents SET last_seen=?, ip=? WHERE id=?', Date.now(), ip, agentId);
     ws.on('message', (raw) => {
       try {
@@ -78,6 +100,12 @@ export class Hub {
         this.alerts.onMetrics(agentId, { cpu: m.cpu, mem, disk });
         break;
       }
+      case 'sca':
+        this.checks.ingestSca(agentId, m);
+        break;
+      case 'inventory':
+        this.checks.ingestInventory(agentId, m);
+        break;
       case 'docker':
         this.db.run('UPDATE agents SET docker=?, last_seen=? WHERE id=?', JSON.stringify(m.containers ?? null), now, agentId);
         if (m.containers) this.alerts.onDocker(agentId, m.containers);

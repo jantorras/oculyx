@@ -13,6 +13,7 @@ import { TelegramBot } from './telegram.ts';
 import { alertCatalog } from './alertinfo.ts';
 import { Policies } from './policy.ts';
 import { registerPolicyRoutes } from './policy-routes.ts';
+import { registerChecksRoutes } from './checks.ts';
 import { Tunnel, validTunnelToken, validHostname } from './tunnel.ts';
 import { RULES, ruleConfig } from './rules.ts';
 import { KeyVault, generateKey, importKey, connect, exec, shell, loadAccess, SshError } from './ssh.ts';
@@ -852,7 +853,8 @@ app.put('/api/rules', admin, async (req, reply) => {
   return { ok: true };
 });
 
-registerPolicyRoutes(app, { db, policies, admin, audit });
+registerPolicyRoutes(app, { db, policies, admin, audit, onChange: () => hub.pushAll() });
+registerChecksRoutes(app, { db, hub, checks: hub.checks, policies, viewer, admin, audit });
 
 // ---------- Cloudflare Tunnel (domain access configured from the web UI) ----------
 const tunnelInfo = () => ({

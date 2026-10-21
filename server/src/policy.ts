@@ -18,7 +18,77 @@ export const BUILTIN: BuiltinDef[] = [
   { id: 'finding', group: 'availability', severity: 'high', enabled: true },
 ];
 
+/** Optional security checks the agent runs (Wazuh-style modules). Arrays add up across layers; switches and numbers override. */
+export interface ChecksConfig {
+  fim: { enabled: boolean; paths: string[]; exclude: string[]; everyMin: number };
+  cve: { enabled: boolean };
+  sca: { enabled: boolean };
+  logs: { enabled: boolean; presets: string[]; custom: { name: string; file: string; pattern: string; severity: string }[] };
+  inventory: { enabled: boolean };
+}
+export type ChecksPatch = { [K in keyof ChecksConfig]?: Partial<ChecksConfig[K]> };
+export const DEFAULT_CHECKS: ChecksConfig = {
+  fim: { enabled: true, paths: [], exclude: [], everyMin: 10 },
+  cve: { enabled: true },
+  sca: { enabled: true },
+  logs: { enabled: false, presets: [], custom: [] },
+  inventory: { enabled: true },
+};
+export const LOG_PRESET_IDS = ['web_attacks', 'oom', 'disk_errors'];
+
+function cleanChecks(raw: any): ChecksPatch | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: ChecksPatch = {};
+  const bool = (v: unknown) => (typeof v === 'boolean' ? v : undefined);
+  const strs = (v: unknown, max: number, len: number, ok: (s: string) => boolean) =>
+    Array.isArray(v) ? [...new Set(v.map((x) => String(x).trim()).filter((s) => s && s.length <= len && ok(s)))].slice(0, max) : undefined;
+  const set = <K extends keyof ChecksConfig>(k: K, v: Partial<ChecksConfig[K]>) => {
+    const clean = Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined));
+    if (Object.keys(clean).length) out[k] = clean as any;
+  };
+  set('fim', {
+    enabled: bool(raw.fim?.enabled),
+    paths: strs(raw.fim?.paths, 50, 200, (s) => s.startsWith('/') && !s.includes('..') && s.length > 1),
+    exclude: strs(raw.fim?.exclude, 30, 100, () => true),
+    everyMin: num(raw.fim?.everyMin, 1, 1440),
+  });
+  set('cve', { enabled: bool(raw.cve?.enabled) });
+  set('sca', { enabled: bool(raw.sca?.enabled) });
+  set('inventory', { enabled: bool(raw.inventory?.enabled) });
+  const custom = Array.isArray(raw.logs?.custom)
+    ? raw.logs.custom
+        .map((c: any) => ({ name: String(c?.name ?? '').trim().slice(0, 60), file: String(c?.file ?? '').trim(), pattern: String(c?.pattern ?? '').trim(), severity: SEVERITIES.includes(c?.severity) ? c.severity : 'medium' }))
+        .filter((c: any) => c.name && c.file.startsWith('/') && !c.file.includes('..') && c.file.length <= 200 && c.pattern && c.pattern.length <= 200 && validRegex(c.pattern))
+        .slice(0, 20)
+    : undefined;
+  set('logs', { enabled: bool(raw.logs?.enabled), presets: strs(raw.logs?.presets, 10, 40, (s) => LOG_PRESET_IDS.includes(s)), custom });
+  return Object.keys(out).length ? out : undefined;
+}
+function validRegex(p: string) {
+  try {
+    new RegExp(p, 'i');
+    return true;
+  } catch {
+    return false;
+  }
+}
+const union = <T>(a: T[], b: T[] | undefined, key: (x: T) => string = String) => {
+  const seen = new Set<string>();
+  return [...a, ...(b ?? [])].filter((x) => !seen.has(key(x)) && seen.add(key(x)));
+};
+export function mergeChecks(base: ChecksConfig, p?: ChecksPatch): ChecksConfig {
+  if (!p) return base;
+  return {
+    fim: { enabled: p.fim?.enabled ?? base.fim.enabled, paths: union(base.fim.paths, p.fim?.paths), exclude: union(base.fim.exclude, p.fim?.exclude), everyMin: p.fim?.everyMin ?? base.fim.everyMin },
+    cve: { enabled: p.cve?.enabled ?? base.cve.enabled },
+    sca: { enabled: p.sca?.enabled ?? base.sca.enabled },
+    inventory: { enabled: p.inventory?.enabled ?? base.inventory.enabled },
+    logs: { enabled: p.logs?.enabled ?? base.logs.enabled, presets: union(base.logs.presets, p.logs?.presets), custom: union(base.logs.custom, p.logs?.custom, (c) => c.name) },
+  };
+}
+
 export interface PolicyConfig {
+  checks?: ChecksPatch;
   thresholds?: { cpu?: number; mem?: number; disk?: number };
   /** consecutive readings above a limit before alerting */
   samples?: number;
@@ -31,6 +101,7 @@ export interface Policy {
   samples: number;
   minSeverity: string;
   rules: Record<string, { enabled: boolean; severity: Sev; severitySet: boolean }>;
+  checks: ChecksConfig;
 }
 
 const num = (v: unknown, lo: number, hi: number) => (Number.isFinite(Number(v)) && Number(v) >= lo && Number(v) <= hi ? Math.round(Number(v)) : undefined);
@@ -57,6 +128,8 @@ export function cleanConfig(raw: any): PolicyConfig {
     if (Object.keys(r).length) rules[id] = r;
   }
   if (Object.keys(rules).length) out.rules = rules;
+  const checks = cleanChecks(raw?.checks);
+  if (checks) out.checks = checks;
   return out;
 }
 
@@ -76,7 +149,7 @@ function globalPolicy(db: Db): Policy {
     const sv = db.setting(`rule.${b.id}.severity`) as Sev;
     rules[b.id] = { enabled: en === '' ? b.enabled : en === '1', severity: SEVERITIES.includes(sv) ? sv : b.severity, severitySet: SEVERITIES.includes(sv) };
   }
-  return { thresholds: th, samples: 3, minSeverity: db.setting('notify.min_severity', 'low'), rules };
+  return { thresholds: th, samples: 3, minSeverity: db.setting('notify.min_severity', 'low'), rules, checks: DEFAULT_CHECKS };
 }
 
 export function applyConfig(base: Policy, cfg: PolicyConfig): Policy {
@@ -86,7 +159,7 @@ export function applyConfig(base: Policy, cfg: PolicyConfig): Policy {
     if (!cur) continue;
     rules[id] = { enabled: v.enabled ?? cur.enabled, severity: v.severity ?? cur.severity, severitySet: cur.severitySet || v.severity !== undefined };
   }
-  return { thresholds: { ...base.thresholds, ...cfg.thresholds }, samples: cfg.samples ?? base.samples, minSeverity: cfg.minSeverity ?? base.minSeverity, rules };
+  return { thresholds: { ...base.thresholds, ...cfg.thresholds }, samples: cfg.samples ?? base.samples, minSeverity: cfg.minSeverity ?? base.minSeverity, rules, checks: mergeChecks(base.checks, cfg.checks) };
 }
 
 const parse = (s: unknown): PolicyConfig => {

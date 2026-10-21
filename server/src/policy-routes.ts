@@ -8,12 +8,15 @@ interface Deps {
   policies: Policies;
   admin: { preHandler: any };
   audit: (user: string | undefined, action: string, target: string | number | undefined, ip: string) => void;
+  /** called after any change, so connected agents get their new check settings */
+  onChange?: () => void;
 }
 
 const ids = (v: unknown): number[] => (Array.isArray(v) ? v.map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 500) : []);
 
 /** Alert profiles, per-host exceptions and maintenance windows. */
-export function registerPolicyRoutes(app: FastifyInstance, { db, policies, admin, audit }: Deps) {
+export function registerPolicyRoutes(app: FastifyInstance, { db, policies: pol, admin, audit, onChange }: Deps) {
+  const policies = { of: pol.of.bind(pol), invalidate: () => { pol.invalidate(); onChange?.(); } };
   const who = (req: any) => req.user?.username as string | undefined;
 
   app.get('/api/policies', admin, async () => {

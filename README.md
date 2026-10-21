@@ -141,6 +141,18 @@ The server runs `cloudflared` itself and shows the tunnel status. Generated agen
 
 *Alert policies* decide what each server alerts about, the way Zabbix templates and Wazuh agent groups do. Reusable **profiles** (Production, Bastion, Database, Docker host, Dev and test are included) set limits, how many readings in a row confirm a problem, the minimum severity that notifies, and which detection rules are on and at what severity. Each host can then add its own **exceptions**; anything left empty is inherited (global settings, then profile, then host). **Maintenance windows** silence a host for a while, and critical alerts can still break through.
 
+## Security checks
+
+*Security checks* is a guided, step-by-step setup (what to check, details, where to apply, review) plus the results for every server. It covers the modules people know from Wazuh:
+
+- **Configuration audit:** about 35 read-only controls inspired by the CIS Linux benchmarks (SSH, file permissions, kernel network settings, firewall, updates, logging), with a 0 to 100 score and the reason and fix for each failed control. Alerts when a control that passed starts failing.
+- **Vulnerabilities (CVE):** installed packages are compared with the public [OSV](https://osv.dev) database (Debian, Ubuntu, Alpine, Rocky, Alma). Only package names and versions are sent. New high and critical findings raise alerts.
+- **Software inventory:** installed packages and enabled services, with an alert (off by default) when something is installed, removed or switched on.
+- **Watched folders:** file integrity monitoring for the folders you choose, with excludes and a schedule. The first pass only learns.
+- **Log rules:** ready-made rules (web attack patterns, out-of-memory kills, disk errors) and your own regular expressions over any log file; only new lines are read.
+
+Settings live in the same profiles and per-host exceptions as the alert policies, so a Docker host or a web server can have its own set.
+
 ## AI assistant (optional)
 
 Turn it on under *Settings, AI*. Bring your own provider: **Claude** (the small, cheap model is the default), **OpenAI or any compatible API** (OpenRouter, Groq, Gemini...) or **Ollama** on your own network for zero cost and full privacy.

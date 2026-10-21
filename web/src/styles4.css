@@ -252,3 +252,47 @@ table.rows td.act { text-align: right; white-space: nowrap; width: 1%; }
 .pol-host input[type=checkbox], table.rows input[type=checkbox] { width: auto; min-height: 0; flex: none; padding: 0; }
 .pol-host span { white-space: nowrap; }
 .pol-host span.muted { white-space: normal; }
+
+/* ---------- security checks ---------- */
+.wiz-steps { display: flex; gap: 6px; list-style: none; padding: 0; margin: 0 0 20px; flex-wrap: wrap; }
+.wiz-steps li { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; color: var(--muted); font-size: 13px; border: 1px solid var(--line); }
+.wiz-steps li span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--surface-2); font-size: 12px; font-weight: 600; }
+.wiz-steps li.cur { color: var(--text); border-color: var(--accent); }
+.wiz-steps li.cur span { background: var(--accent); color: #fff; }
+.wiz-steps li.done span { background: color-mix(in srgb, var(--ok) 25%, transparent); color: var(--ok); }
+.chk-cards { display: grid; gap: 12px; }
+.chk-card { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; background: var(--surface); }
+.chk-card.on { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.chk-card header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.chk-card h3 { margin: 0; font-size: 15px; flex: 1; }
+.chk-card dl { display: grid; grid-template-columns: 130px 1fr; gap: 6px 16px; margin: 0; font-size: 13.5px; }
+.chk-card dt { color: var(--muted); }
+.chk-card dd { margin: 0; line-height: 1.5; max-width: 72ch; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-btn { display: grid; text-align: left; gap: 2px; padding: 8px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: var(--text); cursor: pointer; }
+.chip-btn small { color: var(--muted); font-family: var(--mono, monospace); font-size: 11px; }
+.chip-btn.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.field textarea { width: 100%; font-family: var(--mono, monospace); font-size: 13px; }
+.logrule { display: grid; grid-template-columns: 1fr 1.4fr 1.4fr 110px auto; gap: 8px; margin-bottom: 8px; }
+.radios { display: grid; gap: 8px; }
+.radio { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.radio.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.radio input { width: auto; margin-top: 3px; }
+.review { list-style: none; padding: 0; margin: 0 0 14px; display: grid; gap: 6px; }
+.review li.no { color: var(--muted); }
+.score { font-family: var(--mono, monospace); font-weight: 600; font-size: 18px; }
+.score small { font-size: 11px; color: var(--muted); font-weight: 400; }
+.score.big { font-size: 34px; }
+.score.ok { color: var(--ok); } .score.warn { color: var(--warn); } .score.bad { color: var(--bad); }
+.linkish { background: none; border: 0; padding: 0; color: var(--text); cursor: pointer; }
+.linkish:hover { color: var(--accent); }
+.ctl { border-top: 1px solid var(--line); padding: 10px 2px; }
+.ctl summary { cursor: pointer; display: flex; align-items: center; gap: 10px; list-style: none; }
+.ctl summary::-webkit-details-marker { display: none; }
+.ctl-body { padding: 8px 0 4px 4px; font-size: 13.5px; }
+.ctl-body p { margin: 4px 0; max-width: 78ch; }
+@media (max-width: 760px) {
+  .chk-card dl { grid-template-columns: 1fr; gap: 0; }
+  .chk-card dd { margin-bottom: 8px; }
+  .logrule { grid-template-columns: 1fr; }
+}

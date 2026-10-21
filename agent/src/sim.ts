@@ -3,6 +3,8 @@
  * server/UI pipeline can be explored without Linux machines or Docker.
  * Usage: OCULYX_SERVER=http://localhost:8080 OCULYX_SIM_TOKENS=tok1,tok2,tok3 node agent/src/sim.ts
  */
+import { createHash } from 'node:crypto';
+import { runControls, score } from './sca.ts';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Connection } from './connection.ts';
@@ -100,6 +102,7 @@ function simProvider(h: SimHost): Provider {
   const t0 = Date.now() + rnd(0, 10_000);
   const state = new Map(h.containers.map((c) => [c[0], c[2]]));
   const events: AgentEvent[] = [];
+  let simSent = false;
   let spike = 0;
   const idOf = (i: number) => `${(0xa1b2c3d4e5f6 + i * 7919).toString(16).padStart(12, '0')}${'0'.repeat(52)}`;
   const info: HostInfo = { hostname: h.name, os: h.os, kernel: h.kernel, arch: 'x86_64', cpus: h.cpus, cpuModel: h.cpuModel, memTotal: h.memGb * GB, docker: h.containers.length > 0, agentVersion: '0.1.0-sim', actions: true, canHarden: true };
@@ -165,7 +168,24 @@ function simProvider(h: SimHost): Provider {
       return { findings: h.findings.map((f) => ({ ...f, fix: FIX_MAP[f.checkId] })), ports: h.ports };
     },
     drainEvents: () => events.splice(0),
+    configure: () => { simSent = false; },
+    drainMessages() {
+      if (simSent) return [];
+      simSent = true;
+      const controls = runControls().map((c) => {
+        const roll = (parseInt(createHash('md5').update(h.name + c.id).digest('hex').slice(0, 4), 16) % 100);
+        const fail = roll < (h.eventKinds.length > 3 ? 45 : 22);
+        return { ...c, status: fail ? 'fail' : 'pass', detail: fail ? 'simulated' : undefined };
+      });
+      return [
+        { t: 'sca', ts: Date.now(), score: score(controls as any), controls },
+        { t: 'inventory', ts: Date.now(), os: { id: 'ubuntu', version: '22.04', name: 'Ubuntu 22.04.3 LTS' },
+          packages: [['openssl', '3.0.2-0ubuntu1.10', 'openssl'], ['sudo', '1.9.9-1ubuntu2.2', 'sudo'], ['curl', '7.81.0-1ubuntu1.6', 'curl'], ['nginx', '1.18.0-6ubuntu14.3', 'nginx'], ['bash', '5.1-6ubuntu1', 'bash'], ['openssh-server', '1:8.9p1-3ubuntu0.1', 'openssh']],
+          services: ['ssh', 'cron', 'nginx', 'rsyslog'] },
+      ];
+    },
     async command(action, args) {
+      if (action === 'checks.run') { simSent = false; return { ok: true }; }
       if (action === 'admin.overview') return {
         users: [
           { user: 'root', uid: 0, shell: '/bin/bash', login: true, locked: false, sudo: true },
