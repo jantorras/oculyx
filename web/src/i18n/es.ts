@@ -1,4 +1,13 @@
 export const es: Record<string, string> = {
+  'auth.signin_hint': 'Continúa con tu cuenta de Oculyx.',
+  'auth.feature_monitoring': 'Monitorización de servidores y recursos',
+  'auth.feature_security': 'Comprobaciones de seguridad y configuración',
+  'auth.feature_docker': 'Gestión de contenedores Docker',
+  'auth.show_password': 'Mostrar contraseña',
+  'auth.hide_password': 'Ocultar contraseña',
+  'auth.show': 'Mostrar',
+  'auth.hide': 'Ocultar',
+  'auth.signing_in': 'Iniciando sesión…',
   'nav.group.monitoring': 'Monitorización', 'nav.group.security': 'Seguridad', 'nav.group.alerts': 'Alertas', 'nav.group.tools': 'Herramientas', 'nav.group.administration': 'Administración',
   'common.loading': 'Cargando…', 'common.save': 'Guardar', 'common.saved': 'Guardado', 'common.add': 'Añadir', 'common.delete': 'Eliminar', 'common.close': 'Cerrar',
   'common.copy': 'Copiar comando', 'common.search': 'Buscar…', 'common.view_all': 'Ver todo', 'common.actions': 'Acciones',
