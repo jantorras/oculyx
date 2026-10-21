@@ -3,9 +3,12 @@ import { api, usePoll } from '../lib';
 import { useT, useI18n } from '../i18n';
 import { useUser } from '../App';
 import { toast, ask } from '../components/overlay';
+import { RichReply, type Block } from '../components/RichReply';
+import { Icon } from '../components/ui';
 
 type Proposal = { id: string; agentId: number; host: string; op: string; args: Record<string, unknown>; reason: string };
-type Turn = { role: 'user' | 'assistant'; content: string; proposals?: Proposal[]; error?: boolean };
+type Turn = { role: 'user' | 'assistant'; content: string; blocks?: Block[]; proposals?: Proposal[]; error?: boolean };
+type ChatResponse = { reply: string; blocks?: Block[]; proposals?: Proposal[]; usage: { cost: number; calls: number } };
 
 /** Chat with the fleet assistant. It reads the panel's data and can only propose actions; an admin confirms them. */
 export function Assistant() {
@@ -29,8 +32,8 @@ export function Assistant() {
     setText('');
     setBusy(true);
     try {
-      const r = await api<any>('/ai/chat', { body: { messages: next.filter((x) => !x.error).map((x) => ({ role: x.role, content: x.content })), language: lang } });
-      setTurns([...next, { role: 'assistant', content: r.reply, proposals: r.proposals }]);
+      const r = await api<ChatResponse>('/ai/chat', { body: { messages: next.filter((x) => !x.error).map((x) => ({ role: x.role, content: x.content })), language: lang } });
+      setTurns([...next, { role: 'assistant', content: r.reply, blocks: r.blocks, proposals: r.proposals }]);
       setUsage(r.usage);
     } catch (e: any) {
       setTurns([...next, { role: 'assistant', error: true, content: e.detail || e.message }]);
@@ -54,7 +57,7 @@ export function Assistant() {
   const notReady = status && !status.ready;
 
   return (
-    <div className="page" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 12 }}>
+    <div className="page assistant-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 12 }}>
       <div className="page-head">
         <div className="grow">
           <h1>{t('nav.assistant')}</h1>
@@ -79,12 +82,16 @@ export function Assistant() {
         {turns.map((m, i) => (
           <div key={i} className={`turn ${m.role} ${m.error ? 'err' : ''}`}>
             <div className="who">{m.role === 'user' ? user.username : t('nav.assistant')}</div>
-            <div className="bubble">{m.content}</div>
+            {m.error ? <div className="assistant-error" role="alert"><span className="rr-icon" aria-hidden="true">{Icon.bell}</span><div><strong>{t('ai.error_title')}</strong><p>{m.content}</p></div></div>
+              : m.role === 'assistant' ? <RichReply blocks={m.blocks ?? []} fallback={m.content} />
+              : <div className="bubble">{m.content}</div>}
             {m.proposals?.map((p) => (
-              <div key={p.id} className="proposal">
+              <div key={p.id} className="proposal rr-proposal">
+                <span className="rr-proposal-icon rr-icon" aria-hidden="true">{Icon.play}</span>
                 <div className="grow">
-                  <div className="p-title">{t('ai.proposed')}: <b>{p.op}</b> · {p.host}</div>
-                  <div className="muted small mono">{Object.keys(p.args).length ? JSON.stringify(p.args) : ''}</div>
+                  <div className="rr-card-meta"><span className="rr-proposal-label">{t('ai.proposed')}</span><span className="rr-host"><span className="rr-icon" aria-hidden="true">{Icon.hosts}</span>{p.host}</span></div>
+                  <div className="p-title"><code>{p.op}</code></div>
+                  {Object.keys(p.args).length > 0 && <div className="muted small mono">{JSON.stringify(p.args)}</div>}
                   <div className="muted small">{p.reason}</div>
                 </div>
                 {done.has(p.id) ? <span className="tag ok">{t('ai.done')}</span>

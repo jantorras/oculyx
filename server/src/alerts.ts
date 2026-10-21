@@ -53,7 +53,9 @@ export class Alerts {
       const lang = this.db.setting('notify.language') || this.db.setting('ai.language') || 'en';
       const info = alertInfo(rule, lang);
       const body = [message, info && `${info.meaning}\n\u2192 ${info.todo}`, why].filter(Boolean).join('\n\n');
-      await notify(this.db, { severity, title: `${host}: ${rule.split(':')[0].replaceAll('_', ' ')}`, body });
+      await notify(this.db, { severity, title: `${host}: ${rule.split(':')[0].replaceAll('_', ' ')}`, body,
+        alert: { severity, host, rule, message, why, guidance: info ? `${info.meaning}\n→ ${info.todo}` : undefined },
+      });
     })();
   }
 
@@ -68,7 +70,9 @@ export class Alerts {
 
   resolve(agentId: number, rule: string) {
     const r = this.db.run("UPDATE alerts SET state='closed', closed=? WHERE agent_id=? AND rule=? AND state!='closed'", Date.now(), agentId, rule);
-    if (r.changes) void notify(this.db, { severity: 'ok', title: `${this.agentName(agentId)}: ${rule}`, body: 'resolved' });
+    if (r.changes) void notify(this.db, { severity: 'ok', title: `${this.agentName(agentId)}: ${rule}`, body: 'resolved',
+      alert: { severity: 'ok', host: this.agentName(agentId), rule, message: 'resolved' },
+    });
   }
 
   private check(agentId: number, rule: 'cpu_high' | 'mem_high' | 'disk_high', value: number, label: string) {

@@ -428,7 +428,7 @@ app.post('/api/ai/chat', viewer, async (req, reply) => {
   const messages = (b.messages ?? []).filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').slice(-8) as { role: 'user' | 'assistant'; content: string }[];
   try {
     const r = await ai.chat(messages, b.language);
-    return { reply: r.reply, proposals: r.proposals.map((p) => ({ id: p.id, agentId: p.agentId, host: p.host, op: p.op, args: p.args, reason: p.reason })), usage: ai.usage() };
+    return { reply: r.reply, blocks: r.blocks, proposals: r.proposals.map((p) => ({ id: p.id, agentId: p.agentId, host: p.host, op: p.op, args: p.args, reason: p.reason })), usage: ai.usage() };
   } catch (e) { return aiError(e, reply); }
 });
 app.post('/api/ai/proposals/:id/confirm', admin, async (req, reply) => {

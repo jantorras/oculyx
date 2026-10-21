@@ -1,5 +1,6 @@
 import type { Db } from './db.ts';
 import type { Ai, Proposal } from './ai.ts';
+import { blocksToTelegramHtml, escapeHtml, splitMessage, statusToTelegramHtml, telegramHtmlToText } from './telegramfmt.ts';
 
 /**
  * Telegram bot (long polling, no public URL needed). Only the chat configured for notifications may talk to it.
@@ -13,8 +14,6 @@ interface Deps {
   /** runs an admin operation on a host, audited as the Telegram chat */
   run: (p: Proposal) => Promise<string>;
 }
-
-const MAX = 3900;
 
 export class TelegramBot {
   private d: Deps;
@@ -42,12 +41,19 @@ export class TelegramBot {
     return r.json().catch(() => ({}));
   }
 
-  private async send(token: string, chat: string, text: string, proposals: Proposal[] = []) {
+  private async send(token: string, chat: string, html: string, proposals: Proposal[] = []) {
     const keyboard = proposals.length
       ? { inline_keyboard: proposals.map((p) => [{ text: `Confirm: ${p.op} on ${p.host}`.slice(0, 60), callback_data: `ok:${p.id}` }, { text: 'Cancel', callback_data: `no:${p.id}` }]) }
       : undefined;
-    const lines = proposals.map((p) => `\n> ${p.op} ${JSON.stringify(p.args)} on ${p.host}\n  ${p.reason}`).join('');
-    await this.api(token, 'sendMessage', { chat_id: chat, text: (text + lines).slice(0, MAX) || '...', reply_markup: keyboard });
+    const lines = proposals.map((p) => `\n\n🛠 <b>${escapeHtml(p.op)}</b> · <code>${escapeHtml(p.host)}</code>\n<pre>${escapeHtml(JSON.stringify(p.args))}</pre>\n${escapeHtml(p.reason)}`).join('');
+    const chunks = splitMessage((html + lines) || '...');
+    for (const [i, text] of chunks.entries()) {
+      const reply_markup = i === chunks.length - 1 ? keyboard : undefined;
+      const res = await this.api(token, 'sendMessage', { chat_id: chat, text, parse_mode: 'HTML', reply_markup });
+      if (!res.ok && /can.?t parse entities/i.test(String(res.description))) {
+        await this.api(token, 'sendMessage', { chat_id: chat, text: telegramHtmlToText(text), reply_markup });
+      }
+    }
   }
 
   private async loop() {
@@ -78,17 +84,17 @@ export class TelegramBot {
       const [verb, id] = String(cb.data ?? '').split(':');
       const p = this.d.ai.proposals.get(id);
       await this.api(token, 'answerCallbackQuery', { callback_query_id: cb.id });
-      if (!p || p.used || Date.now() - p.created > 15 * 60_000) return this.send(token, chat, 'That proposal expired.');
+      if (!p || p.used || Date.now() - p.created > 15 * 60_000) return this.send(token, chat, '⚪ <b>Proposal expired</b>\nAsk again to create a new proposal.');
       p.used = true;
-      if (verb !== 'ok') return this.send(token, chat, 'Cancelled.');
-      try { await this.send(token, chat, await this.d.run(p)); } catch (e) { await this.send(token, chat, `Failed: ${(e as Error).message}`); }
+      if (verb !== 'ok') return this.send(token, chat, '⚪ <b>Cancelled</b>\nThe proposal was cancelled.');
+      try { await this.send(token, chat, `🟢 <b>Result</b>\n${escapeHtml(await this.d.run(p))}`); } catch (e) { await this.send(token, chat, `🔴 <b>Failed</b>\n${escapeHtml((e as Error).message)}`); }
       return;
     }
     const text = String(u.message?.text ?? '').trim();
     if (!text) return;
-    if (/^\/(start|help)\b/.test(text)) return this.send(token, chat, '/status: fleet at a glance\n/alerts: open alerts\nAnything else: ask me about your servers.');
-    if (/^\/status\b/.test(text)) return this.send(token, chat, this.d.status());
-    if (/^\/alerts\b/.test(text)) return this.send(token, chat, this.d.alertsText());
+    if (/^\/(start|help)\b/.test(text)) return this.send(token, chat, '💡 <b>Oculyx assistant</b>\n\n🖥 /status — fleet at a glance\n🔎 /alerts — open alerts\n\nAsk me about your servers. Proposed actions have <b>Confirm</b> and <b>Cancel</b> buttons.');
+    if (/^\/status\b/.test(text)) return this.send(token, chat, statusToTelegramHtml(this.d.status()));
+    if (/^\/alerts\b/.test(text)) return this.send(token, chat, statusToTelegramHtml(this.d.alertsText(), 'Open alerts'));
     if (Date.now() - this.lastMsg < 1500) return; // flood guard: every answer can cost money
     this.lastMsg = Date.now();
     await this.api(token, 'sendChatAction', { chat_id: chat, action: 'typing' });
@@ -97,10 +103,10 @@ export class TelegramBot {
     try {
       const r = await this.d.ai.chat(this.history, 'telegram');
       this.history.push({ role: 'assistant', content: r.reply });
-      await this.send(token, chat, r.reply, r.proposals);
+      await this.send(token, chat, blocksToTelegramHtml(r.blocks), r.proposals);
     } catch (e) {
       this.history.pop();
-      await this.send(token, chat, `AI: ${(e as Error).message}`);
+      await this.send(token, chat, `🔴 <b>Assistant unavailable</b>\n${escapeHtml((e as Error).message)}`);
     }
   }
 }
