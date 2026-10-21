@@ -657,7 +657,7 @@ export const en: Record<string, string> = {
   'chk.fim.p_binaries': 'Programs and cron',
   'chk.fim.p_docker': 'Docker',
   'chk.fim.paths': 'Folders or files to watch (one per line)',
-  'chk.fim.paths_help': 'Full paths starting with /. Folders are watched with everything inside.',
+  'chk.fim.paths_help': 'Full paths starting with /. Folders are watched with everything inside. Avoid /tmp: the agent has its own private /tmp.',
   'chk.fim.exclude': 'Ignore (one per line)',
   'chk.fim.exclude_help': 'For example *.log ignores log files, cache/ ignores any cache folder.',
   'chk.fim.every': 'How often to look',

@@ -657,7 +657,7 @@ export const es: Record<string, string> = {
   'chk.fim.p_binaries': 'Programas y cron',
   'chk.fim.p_docker': 'Docker',
   'chk.fim.paths': 'Carpetas o archivos a vigilar (uno por línea)',
-  'chk.fim.paths_help': 'Rutas completas que empiezan por /. Las carpetas se vigilan con todo su contenido.',
+  'chk.fim.paths_help': 'Rutas completas que empiezan por /. Las carpetas se vigilan con todo su contenido. Evita /tmp: el agente tiene su propio /tmp privado.',
   'chk.fim.exclude': 'Ignorar (uno por línea)',
   'chk.fim.exclude_help': 'Por ejemplo *.log ignora archivos de log, cache/ ignora cualquier carpeta cache.',
   'chk.fim.every': 'Cada cuánto mirar',

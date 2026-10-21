@@ -132,13 +132,13 @@ sudo userdel -r ocx-intruder 2>/dev/null || true
 sudo rm -f /etc/cron.d/ocx-evil
 sudo pkill -f '/dev/tcp/127.0.0.1/9999' 2>/dev/null || true
 echo "== security checks: configuration audit, inventory, watched folders, log rules"
-mkdir -p /tmp/ocx-watch && echo v1 > /tmp/ocx-watch/app.conf && : > /tmp/ocx-app.log
-put "/agents/$ID/policy" '{"overrides":{"checks":{"fim":{"enabled":true,"paths":["/tmp/ocx-watch"],"everyMin":1},"logs":{"enabled":true,"custom":[{"name":"app errors","file":"/tmp/ocx-app.log","pattern":"FATAL|boom","severity":"high"}]}}}}' >/dev/null && ok "checks configured from the panel"
+sudo mkdir -p /srv/ocx-watch && echo v1 | sudo tee /srv/ocx-watch/app.conf >/dev/null && sudo touch /var/log/ocx-app.log
+put "/agents/$ID/policy" '{"overrides":{"checks":{"fim":{"enabled":true,"paths":["/srv/ocx-watch"],"everyMin":1},"logs":{"enabled":true,"custom":[{"name":"app errors","file":"/var/log/ocx-app.log","pattern":"FATAL|boom","severity":"high"}]}}}}' >/dev/null && ok "checks configured from the panel"
 wait_for "configuration audit score" 120 bash -c "curl -fsS $API/agents/$ID/checks -H '$H' | jq -e '.sca.score >= 0 and (.sca.controls | length > 20)'"
 wait_for "software inventory" 120 bash -c "curl -fsS $API/agents/$ID/checks -H '$H' | jq -e '.inventory.packages > 50'"
 sleep 20
-echo v2 > /tmp/ocx-watch/app.conf; echo evil > /tmp/ocx-watch/backdoor.php
-echo "2024 FATAL boom in worker" >> /tmp/ocx-app.log
+echo v2 | sudo tee /srv/ocx-watch/app.conf >/dev/null; echo evil | sudo tee /srv/ocx-watch/backdoor.php >/dev/null
+echo "2024 FATAL boom in worker" | sudo tee -a /var/log/ocx-app.log >/dev/null
 wait_for "log rule match" 60 bash -c "curl -fsS '$API/events?type=log_match' -H '$H' | jq -e 'length > 0'"
 wait_for "watched folder change" 150 bash -c "curl -fsS '$API/events?type=fim_custom' -H '$H' | jq -e 'length > 0'"
 get '/alerts?state=open' | jq -e 'map(select(.rule | startswith("fim_custom"))) | length > 0' >/dev/null && ok "alert fim_custom" || die "no alert for fim_custom"
